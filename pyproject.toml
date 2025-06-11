@@ -4,4 +4,15 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "click>=8.2.0",
+    "imgui>=2.0.0",
+    "openslide-bin>=4.0.0.8",
+    "openslide-python>=1.4.2",
+    "pyrfr>=0.9.0",
+    "pyvips>=3.0.0",
+    "slideflow>=3.0.2",
+    "swig>=4.3.1",
+    "torch>=2.7.0",
+    "torchvision>=0.22.0",
+]

@@ -1,0 +1,7 @@
+test_dataset
+.python-version
+.venv
+uv.lock
+slideflow.log
+data
+__pycache__
