@@ -1,5 +1,4 @@
 from enum import Enum
-from time import time
 
 """
 Variables and utility methods used throughout the project.
@@ -29,7 +28,7 @@ class RESOLUTION_PRESETS(Enum):
 # --- Bags ---
 
 # Feature Extractor to use
-FEATURE_EXTRACTOR: str = "plip"
+FEATURE_EXTRACTOR: str = "uni"
 
 # --- Training ---
 

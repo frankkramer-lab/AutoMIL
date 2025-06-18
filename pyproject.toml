@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "click>=8.2.0",
     "imgui>=2.0.0",
+    "nystrom-attention>=0.0.14",
     "openslide-bin>=4.0.0.8",
     "openslide-python>=1.4.2",
     "pyrfr>=0.9.0",
