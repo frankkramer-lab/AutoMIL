@@ -29,9 +29,11 @@ def get_slide_magnification(slide_path: str) -> str | None:
 if __name__ == "__main__":
 
     for slide in Path("test_dataset").iterdir():
-        if not slide.suffix == ".svs": continue
+        if not slide.suffix == ".svs":
+            continue
         mag = get_slide_magnification(str(slide))
         log.info(f"{slide} | [cyan]{mag}{'x' if mag is not None else ''}[/]")
+
 
 
 

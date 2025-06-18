@@ -1,4 +1,5 @@
 from enum import Enum
+from time import time
 
 """
 Variables and utility methods used throughout the project.
@@ -21,8 +22,9 @@ RANDOM_SEED: int = 42
 
 # Resolution Presets for extracting dataset tiles (specifies tile size and magnification level)
 class RESOLUTION_PRESETS(Enum):
-    Low = (1_000, "10x")
-    High = (299, "20x")
+    Low   = (1_000, "10x")
+    High  = (299, "20x")
+    Ultra = (224, "40x")
 
 # --- Bags ---
 
