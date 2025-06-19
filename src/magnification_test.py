@@ -1,10 +1,10 @@
 from pathlib import Path
+from typing import Optional
 
 import openslide
 from slideflow import log
 
-
-def get_slide_magnification(slide_path: str) -> str | None:
+def get_slide_magnification(slide_path: str) -> Optional[str]:
     """Retrieves magnification from slide properties or estimates it using microns per pixel (mpp)
 
     Args:

@@ -21,8 +21,6 @@ def AutoMIL(slide_dir: str, project_dir: str, annotation_file: str, verbose: boo
         cleanup=cleanup
     )
 
-
-
 if __name__ == '__main__':
     AutoMIL()
 

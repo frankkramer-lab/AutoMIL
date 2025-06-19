@@ -1,7 +1,7 @@
 import numpy as np
+from typing import Tuple
 
-
-def estimate_TransMIL_memory_usage(input_size: tuple[int, int, int]) -> float:
+def estimate_TransMIL_memory_usage(input_size: Tuple[int, int, int]) -> float:
     """
     Estimate the VRAM memory usage (in megabytes) during the forward pass of TransMIL.
 
@@ -23,7 +23,7 @@ def estimate_TransMIL_memory_usage(input_size: tuple[int, int, int]) -> float:
     Returns:
         float: Estimated VRAM usage in megabytes (MB)
     """
-    B, N, C = input_size
+    B, N, _ = input_size
     total_elements = 0
 
     # fc1: [B, N, 512]

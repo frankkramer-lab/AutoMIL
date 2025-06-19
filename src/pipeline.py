@@ -27,19 +27,18 @@ def configure_image_backend(verbose: bool = True):
         verbose (bool, optional): Whether to log info messages. Defaults to True.
     """
     system = platform.system().lower()
-    match system:
-        case "windows":
-            if verbose:
-                log.info("Using [cyan]libvips[/] backend on Windows")
-            os.environ["SF_SLIDE_BACKEND"] = "libvips"
-        case "linux":
-            if verbose:
-                log.info("Using [cyan]openslide[/] backend on Linux")
-            os.environ["SF_SLIDE_BACKEND"] = "openslide"
-        case _:
-            if verbose:
-                log.error(f"Unsupported OS: [red]{system}[/]")
-            sys.exit(1)
+    if system == "windows":
+        if verbose:
+            log.info("Using [cyan]libvips[/] backend on Windows")
+        os.environ["SF_SLIDE_BACKEND"] = "libvips"
+    elif system == "linux":
+        if verbose:
+            log.info("Using [cyan]openslide[/] backend on Linux")
+        os.environ["SF_SLIDE_BACKEND"] = "openslide"
+    else:
+        if verbose:
+            log.error(f"Unsupported OS: [red]{system}[/]")
+        sys.exit(1)
 
 
 def setup_project(slide_dir: Path, project_dir: Path, annotation_file: Path, verbose: bool = True) -> sf.Project:
@@ -133,7 +132,7 @@ def train(project: sf.Project, dataset: sf.Dataset, k: int = 3, verbose: bool = 
         batch_size=BATCH_SIZE
     )
 
-    for i, (train, val) in enumerate(dataset.kfold_split(k=5, labels="subtype")):
+    for i, (train, val) in enumerate(dataset.kfold_split(k, labels="subtype")):
         if verbose:
             log.info(f"Training fold {i+1}/5")
         train_mil(
