@@ -2,6 +2,9 @@ test_dataset
 .python-version
 .venv
 uv.lock
+sandbox.py
 slideflow.log
 data
 __pycache__
+*.txt
+*.log
