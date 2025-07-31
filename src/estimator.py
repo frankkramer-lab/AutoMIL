@@ -8,26 +8,17 @@ from utils import MAX_BATCH_SIZE, get_gpu_memory
 
 
 def estimate_TransMIL_memory_usage(input_size: Tuple[int, int, int]) -> float:
-    """
-    Estimate the VRAM memory usage (in megabytes) during the forward pass of TransMIL.
+    """Estimate the VRAM memory usage during the forward pass of TransMIL.
 
-    This includes intermediate activations from:
-        - Input projection (fc1)
-        - Padding and cls token
-        - Transformer layers (x2)
-        - Positional encoding (PPEG)
-        - LayerNorm and final classifier
-
+    This includes intermediate activations from input projection, padding and cls token,
+    transformer layers, positional encoding (PPEG), LayerNorm and final classifier.
     Assumes activations are stored as float32 (4 bytes per value).
 
     Args:
-        input_size (Tuple[int, int, int]): A tuple (B, N, C) representing:
-            - B: batch size (number of bags)
-            - N: number of instances (patches) per bag
-            - C: feature dimension of each instance (e.g., 1024)
+        input_size: A tuple (B, N, C) where B is batch size, N is number of instances per bag, and C is feature dimension
 
     Returns:
-        float: Estimated VRAM usage in megabytes (MB)
+        Estimated VRAM usage in megabytes.
     """
     B, n, _ = input_size
     total_elements = 0
@@ -71,19 +62,18 @@ def estimate_dynamic_vram_usage(
     num_classes: int = 2,
     return_rounded: bool = True
 ) -> float:
-    """
-    Estimate the approximate VRAM usage dynamically (in MB) for a given torch module.
+    """Estimate the approximate VRAM usage dynamically for a given torch module.
 
     Args:
-        model_cls (Type[nn.Module]): The MIL model class (e.g., TransMIL).
-        input_dim (int): Feature vector size per tile (default 1024).
-        tiles_per_bag (int): Number of tiles per bag/sample (default 100).
-        batch_size (int): Number of samples per batch (default 4).
-        num_classes (int): Number of output classes for the model. This should be 2.
-        return_rounded (bool): Whether to round the result to 2 decimal places (default True).
+        model_cls: The MIL model class (e.g., TransMIL)
+        input_dim: Feature vector size per tile
+        tiles_per_bag: Number of tiles per bag/sample
+        batch_size: Number of samples per batch
+        num_classes: Number of output classes for the model
+        return_rounded: Whether to round the result to 2 decimal places
 
     Returns:
-        float: Estimated VRAM usage in megabytes (MB).
+        Estimated VRAM usage in megabytes.
     """
     # Initiate Model and set it to evaluation mode
     try:
@@ -140,17 +130,17 @@ def adjust_batch_size(
     input_dim: int,
     tiles_per_bag: int
 ) -> int:
-    """Adjusts batch size based on the available memory
+    """Adjust batch size based on the available memory.
 
     Args:
-        model_cls (Type[nn.Module]): The MIL model class (e.g., TransMIL).
-        initial_batch_size (int): Initial batch size
-        num_slides (int): Number of slides in the dataset (used to compute upper bound for batch size)
-        input_dim (int): Feature vector size (usually 1024)
-        tiles_per_bag (int): Number of tiles per bag
+        model_cls: The MIL model class (e.g., TransMIL)
+        initial_batch_size: Initial batch size
+        num_slides: Number of slides in the dataset (used to compute upper bound for batch size)
+        input_dim: Feature vector size (usually 1024)
+        tiles_per_bag: Number of tiles per bag
 
     Returns:
-        int: Batch size adjusted to available memory
+        Batch size adjusted to available memory.
     """
     global MAX_BATCH_SIZE
     

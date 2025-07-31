@@ -88,13 +88,13 @@ HIGHLIGHT_CLR:  str = "yellow"     # Highlighting     | Important information
 # --- Logging ---
 
 def get_vlog(verbose: bool) -> Callable:
-    """Returns a logging function that only logs messages if verbose is True.
+    """Return a logging function that only logs messages if verbose is True.
 
     Args:
-        verbose (bool): Verbosity flag
+        verbose: Verbosity flag
 
     Returns:
-        Callable[[str, Any], None]: Logging function
+        Logging function that conditionally logs messages.
     """
     def _vlog(message: str) -> None:
         if verbose:
@@ -102,10 +102,10 @@ def get_vlog(verbose: bool) -> Callable:
     return _vlog
 
 def get_gpu_memory() -> dict:
-    """Utility Method that returns the free and total GPU memory
+    """Return the free and total GPU memory information.
 
     Returns:
-        dict: dictionary with free memory (key: free_MB), the total memory (key: total_MB) and the memory in usage (key: used_MB)
+        Dictionary with free memory (free_MB), total memory (total_MB) and used memory (used_MB).
     """
     free_mem, total_mem = torch.cuda.mem_get_info()
     return {
@@ -115,24 +115,24 @@ def get_gpu_memory() -> dict:
     }
 
 def get_num_slides(dataset: sf.Dataset) -> int:
-    """Returns the number of slides in a given dataset source
+    """Return the number of slides in a given dataset source.
 
     Args:
-        dataset (sf.Dataset): Dataset object
+        dataset: Dataset object
 
     Returns:
-        int: number of slides
+        Number of slides in the dataset.
     """
     return len(dataset.slide_paths())
 
 def get_slide_magnification(slide_path: str | Path) -> Optional[str]:
-    """Retrieves magnification from slide properties or estimates it using microns per pixel (mpp)
+    """Retrieve magnification from slide properties or estimate using microns per pixel.
 
     Args:
-        slide_path (str): path to slide as string
+        slide_path: Path to slide as string or Path object
 
     Returns:
-        str | None: magnification as string (e.g. '20') or None if unable
+        Magnification as string (e.g. '20') or None if unable to determine.
     """
     try:
         slide = openslide.OpenSlide(slide_path)
@@ -148,13 +148,13 @@ def get_slide_magnification(slide_path: str | Path) -> Optional[str]:
         return None
 
 def get_lowest_magnification(slide_dir: Path) -> Optional[str]:
-    """Returns the lowest magnification from slides in a directory.
+    """Return the lowest magnification from slides in a directory.
 
     Args:
-        slide_dir (Path): Path to directory containing slide files
+        slide_dir: Path to directory containing slide files
 
     Returns:
-        Optional[str]: Lowest magnification as string or None if no valid magnification found
+        Lowest magnification as string or None if no valid magnification found.
     """
     magnifications = []
     for slide_path in slide_dir.iterdir():
@@ -166,14 +166,13 @@ def get_lowest_magnification(slide_dir: Path) -> Optional[str]:
     return str(min(magnifications)) if magnifications else None
 
 def get_mpp_from_slide(slide_path: Path) -> Optional[float]:
-    """
-    Extract microns per pixel (MPP) from a slide file using OpenSlide.
+    """Extract microns per pixel (MPP) from a slide file using OpenSlide.
 
     Args:
-        slide_path (Path): Path to the slide file (.svs, .tiff, etc.)
+        slide_path: Path to the slide file (.svs, .tiff, etc.)
 
     Returns:
-        Optional[float]: MPP value if available, else None
+        MPP value if available, else None.
     """
     try:
         slide = openslide.OpenSlide(slide_path)
@@ -185,14 +184,14 @@ def get_mpp_from_slide(slide_path: Path) -> Optional[float]:
         return None
     
 def calculate_average_mpp(slide_dir: Path, return_rounded: bool = True) -> Optional[float]:
-    """Calculates the average microns per pixel (MPP) from all slides in a directory.
+    """Calculate the average microns per pixel (MPP) from all slides in a directory.
 
     Args:
-        slide_dir (Path): Path to the directory containing slide files.
-        return_rounded (bool): Whether to round the result to 2 decimal places (default True).
+        slide_dir: Path to the directory containing slide files
+        return_rounded: Whether to round the result to 2 decimal places
 
     Returns:
-        Optional[float]: Average MPP if available, else None.
+        Average MPP if available, else None.
     """
     mpp_values = []
     for slide_path in slide_dir.iterdir():
@@ -204,13 +203,13 @@ def calculate_average_mpp(slide_dir: Path, return_rounded: bool = True) -> Optio
     return average_mpp
 
 def get_slide_properties(slide_path: str) -> Optional[dict]:
-    """Retrieves slide properties as a dictionary.
+    """Retrieve slide properties as a dictionary.
 
     Args:
-        slide_path (str): path to slide as string
+        slide_path: Path to slide as string
 
     Returns:
-        Optional[dict]: dictionary with slide properties or None if unable to retrieve
+        Dictionary with slide properties or None if unable to retrieve.
     """
     try:
         slide = openslide.OpenSlide(slide_path)
@@ -220,21 +219,21 @@ def get_slide_properties(slide_path: str) -> Optional[dict]:
         return None
 
 def remove_pip_version_specs(required_packages_file: Path, out_file: Optional[Path] = None) -> None:
-    """Removes the version specifiers from a file with pip package requirements as produced by pip freeze.
+    """Remove version specifiers from a file with pip package requirements.
 
-    Example:
-        beautifulsoup4==4.13.4
-        click==8.1.8
-        ***************
-        beautifulsoup4
-        click==8.1.8
+    Processes a file produced by pip freeze and removes version specifiers,
+    converting "beautifulsoup4==4.13.4" to "beautifulsoup4".
 
     Args:
-        required_packages_file (Path): Path to file with required packages list
-        out_file (Optional[Path], optional): Path to write modified package list to. If not specified, takes 'required_packages_file'.
+        required_packages_file: Path to file with required packages list
+        out_file: Path to write modified package list to. If not specified, overwrites the input file.
 
     Raises:
-        ValueError: If 'required_packages_file'
+        ValueError: If required_packages_file is not a valid file.
+
+    Example:
+        >>> remove_pip_version_specs(Path("requirements.txt"))
+        # Converts: beautifulsoup4==4.13.4 -> beautifulsoup4
     """
     if not required_packages_file.is_file():
         raise ValueError(f"{required_packages_file} is not a file")
@@ -252,16 +251,16 @@ def remove_pip_version_specs(required_packages_file: Path, out_file: Optional[Pa
         file_stream.write("\n".join(version_removed_lines))
 
 def get_bag_avg_and_num_features(bags_dir: Path) -> tuple[int, int]:
-    """Computes the average number of tiles per bag (for estimation) and the number of features per tile.
+    """Compute the average number of tiles per bag and the number of features per tile.
 
     Args:
-        bags_dir (Path): Path to the directory containing the feature bags.
+        bags_dir: Path to the directory containing the feature bags
+
+    Returns:
+        A tuple containing the average number of tiles per bag and the number of features per tile.
 
     Raises:
         ValueError: If no valid .pt feature bags are found in the specified directory.
-
-    Returns:
-        tuple[int, int]: Tuple containing the average number of tiles per bag and the number of features per tile.
     """
     num_tiles = []
     num_features = 0
@@ -281,14 +280,14 @@ def get_bag_avg_and_num_features(bags_dir: Path) -> tuple[int, int]:
     return (int(sum(num_tiles) / len(num_tiles)), num_features)
 
 def get_unique_labels(annotations_file: Path, label_column: str) -> list[str]:
-    """Extracts list of unique labels from the specified column (should be the labels) in the annotations file.
+    """Extract list of unique labels from the specified column in the annotations file.
 
     Args:
-        annotations_file (Path): Path to the annotations CSV file.
-        label_column (str):      Name of the column containing labels.
+        annotations_file: Path to the annotations CSV file
+        label_column: Name of the column containing labels
 
     Returns:
-        list[str]: List of unique labels found in the specified column.
+        List of unique labels found in the specified column.
     """
     annotations = pd.read_csv(annotations_file)
     return [str(label) for label in annotations[label_column].dropna().unique()]
@@ -299,15 +298,14 @@ def get_unique_labels(annotations_file: Path, label_column: str) -> list[str]:
 T = TypeVar('T')
 
 def batch_generator(input_list: list[T], batch_size: int) -> Generator[list[T], None, None]: 
-    """
-    Generator that yields batches of a given size from the input list.
+    """Generate batches of a given size from the input list.
     
     Args:
-        input_list (list): List of items to be batched.
-        batch_size (int):  Size of each batch.
+        input_list: List of items to be batched
+        batch_size: Size of each batch
     
     Yields:
-        batch (list):      A batch of items from the input list.
+        A batch of items from the input list.
     """
     for i in range(0, len(input_list), batch_size):
         yield input_list[i:i + batch_size]
@@ -315,14 +313,14 @@ def batch_generator(input_list: list[T], batch_size: int) -> Generator[list[T], 
 # --- PNG -> TIFF Conversion ---
 
 def convert_img_to_tiff(in_path: Path, out_path: Path) -> str:
-    """Converts a given image into a .tiff file
+    """Convert a given image into a TIFF file.
 
     Args:
-        in_path (Path):     Input path to image (.png, .jpg, ...)
-        out_path (Path):    Output path to where to save the converted .tiff to
+        in_path: Input path to image (.png, .jpg, ...)
+        out_path: Output path where to save the converted TIFF
     
     Returns:
-        str: Error message in case of failure or an empty string in case of success
+        Error message in case of failure or an empty string in case of success.
     """
     try:
         image = pyvips.Image.new_from_file(in_path)
@@ -336,15 +334,15 @@ def convert_img_to_tiff(in_path: Path, out_path: Path) -> str:
         return ""
 
 def convert_worker(in_path: Path, out_folder: Path, verbose: bool = True) -> Path | None:
-    """Worker function for converting a single image to .tiff format.
+    """Worker function for converting a single image to TIFF format.
 
     Args:
-        in_path (Path): Path to input image file to convert
-        out_folder (Path): Path to output folder in which to save the tiff
-        verbose (bool): Verbose flag to log progress messages
+        in_path: Path to input image file to convert
+        out_folder: Path to output folder in which to save the TIFF
+        verbose: Whether to log progress messages
 
     Returns:
-        Path | None: Path to the converted .tiff file if successful, None if conversion failed
+        Path to the converted TIFF file if successful, None if conversion failed.
     """
     out_path = out_folder / f"{in_path.stem}.tiff"
     vlog = get_vlog(verbose)
@@ -363,16 +361,18 @@ def convert_worker(in_path: Path, out_folder: Path, verbose: bool = True) -> Pat
         return out_path
 
 def batch_conversion(file_list: list[Path], out_folder: Path, verbose: bool = True) -> list[Path]:
-    """Converts a list of image files to .tiff and saves them in the given output folder.
+    """Convert a list of image files to TIFF and save them in the output folder.
 
     Args:
-        file_list (list[Path]):     List of file paths to convert
-        out_folder (Path):          Path to output folder in which to save the tiffs.
-                                    The tiff file will inherit the original files stem (i.e /input/image.png => /output/image.tiff)
-        verbose (bool, optional):   Whether to log progress messages. Defaults to False.
+        file_list: List of file paths to convert
+        out_folder: Path to output folder in which to save the TIFFs
+        verbose: Whether to log progress messages
     
     Returns:
-        file_list (list[Path]):     List of paths to .tiff files
+        List of paths to converted TIFF files.
+
+    Note:
+        The TIFF file will inherit the original file's stem (e.g. /input/image.png -> /output/image.tiff).
     """
     out_list = []   # List of output files
     vlog = get_vlog(verbose)
@@ -397,15 +397,15 @@ def batch_conversion(file_list: list[Path], out_folder: Path, verbose: bool = Tr
     return out_list
 
 def batch_conversion_concurrent(file_list: list[Path], out_folder: Path, verbose: bool = True) -> list[Path]:
-    """Multithreaded version of batch_conversion. Uses convert_worker.
+    """Multithreaded version of batch_conversion using convert_worker.
 
     Args:
-        file_list (list[Path]): List of file paths to convert
-        out_folder (Path): Path to output folder in which to save the tiffs.
-        verbose (bool, optional): Verbose flag. Defaults to True.
+        file_list: List of file paths to convert
+        out_folder: Path to output folder in which to save the TIFFs
+        verbose: Whether to log progress messages
 
     Returns:
-        list[Path]: List of paths to converted .tiff files.
+        List of paths to converted TIFF files.
     """
     out_list = []
     max_workers = min(32, len(file_list))  # Reasonable upper limit on threads

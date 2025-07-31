@@ -24,19 +24,17 @@ from utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, FEATURE_EXTRACTOR,
 
 
 def configure_image_backend(verbose: bool = True):
-    """Selects the image backend based on the systems operating system
+    """Select the image backend based on the system's operating system.
 
-    During tiling, cucim and openslide create new processes/threads through 'forking'. \\
-    'fork' is an unsupported system call on windows, thus we use libvips. \\
-    
-    **NOTE**: Make sure libvips is installed and in your PATH if you're using windows. \\
-    **NOTE**: This method terminates the current script upon encountering a invalid OS.
+    During tiling, cucim and openslide create new processes/threads through 'forking'.
+    'fork' is an unsupported system call on Windows, thus we use libvips.
     
     Args:
-        verbose (bool, optional): Whether to log info messages. Defaults to True.
-        
-    Returns:
-        None
+        verbose: Whether to log info messages
+
+    Note:
+        Make sure libvips is installed and in your PATH if you're using Windows.
+        This method terminates the current script upon encountering an invalid OS.
     """
     vlog = get_vlog(verbose)
     system = platform.system().lower()
@@ -59,26 +57,27 @@ def setup_annotations(
         transform_labels: bool = True,
         verbose:          bool = True
     ) -> tuple[Path, dict | list[str]]:
-    """Modifies a given annotations file to conform to slideflows expected format
+    """Modify annotations file to conform to slideflow's expected format.
 
-    NOTE:
-        The annotations file may contain any number of columns, but slideflow expects at least the 'label' and 'patient' column. \n
-        This method renames the given columns to 'patient' and 'label' respectively and saves the modified .csv to the project folder.
+    The annotations file may contain any number of columns, but slideflow expects
+    at least the 'label' and 'patient' columns. This method renames the given
+    columns to 'patient' and 'label' respectively and saves the modified CSV
+    to the project folder.
 
     Args:
-        annotations_file (Path): Path to the annotations file in .csv format
-        patient_column (str): Name of the column containing patient identifiers (Will be renamed to 'patient')
-        label_column (str): Name of the column containing labels (Will be renamed to 'label')
-        project_dir (Path): Directory in which the project structure will be created (modified annotations will be stored here)
-        slide_column (Optional[str], optional): Name of the column containing slide identifiers (Will be renamed to 'slide'). Defaults to None.
-        transform_labels (bool, optional): Whether to transform labels to float values. Defaults to True.
+        annotations_file: Path to the annotations file in CSV format
+        patient_column: Name of the column containing patient identifiers (renamed to 'patient')
+        label_column: Name of the column containing labels (renamed to 'label')
+        project_dir: Directory where the project structure will be created
+        slide_column: Name of the column containing slide identifiers (renamed to 'slide')
+        transform_labels: Whether to transform labels to float values
+        verbose: Whether to log info messages
+
+    Returns:
+        A tuple containing the path to the modified annotations file and the label mapping.
 
     Raises:
         Exception: If unable to create the modified annotation file
-
-    Returns:
-        tuple[Path, dict | list[str]]: Tuple containing the path to modified annotations file 
-                                      (project_dir/annotations.csv) and the label mapping
     """
     vlog = get_vlog(verbose)
     annotations = pd.read_csv(annotations_file, index_col=patient_column)
@@ -125,21 +124,22 @@ def create_project_scaffold(
         transform_labels: bool = True,
         verbose: bool = True
     ) -> tuple[Path, dict | list[str]]:
-    """Sets up a simple project directory structure with an annotations file. Creates the *project_dir* folder if it does not exist.
-    saves a modified version of the annotations file to *project_dir/annotations.csv* if it does not exist.
+    """Set up a simple project directory structure with an annotations file.
+
+    Creates the project directory if it doesn't exist and saves a modified
+    version of the annotations file to 'project_dir/annotations.csv'.
 
     Args:
-        project_dir (Path): Path to the project directory
-        annotations_file (Path): Path to the annotations file in .csv format
-        patient_column (str): Column name containing patient identifiers (Will be renamed to 'patient')
-        label_column (str): Column name containing labels (Will be renamed to 'label')
-        slide_column (Optional[str], optional): Column name containing slide identifiers (Will be renamed to 'slide'). Defaults to None.
-        transform_labels (bool, optional): Whether to transform labels to float values. Defaults to True.
-        verbose (bool, optional): Whether to log info messages. Defaults to True.
-    
+        project_dir: Path to the project directory
+        annotations_file: Path to the annotations file in CSV format
+        patient_column: Column name containing patient identifiers (renamed to 'patient')
+        label_column: Column name containing labels (renamed to 'label')
+        slide_column: Column name containing slide identifiers (renamed to 'slide')
+        transform_labels: Whether to transform labels to float values
+        verbose: Whether to log info messages
+
     Returns:
-        tuple[Path, dict | list[str]]: Tuple containing the path to the modified annotations file 
-                                      (*project_dir/annotations.csv*) and the label mapping
+        A tuple containing the path to the modified annotations file and the label mapping.
     """
     vlog = get_vlog(verbose)
     # Simple project directory creation
@@ -171,16 +171,19 @@ def setup_project(
         annotation_file: Path,
         verbose:         bool = True
     ) -> sf.Project:
-    """Sets up the project structure in *project_dir* or loads it into a Project Instance, if it already exists
+    """Set up the project structure or load existing project.
+
+    Sets up the project structure in project_dir or loads it into a Project
+    instance if it already exists.
 
     Args:
-        slide_dir (Path): directory containing slides
-        project_dir (Path): directory in which the project structure should be created or is already present
-        annotation_file (Path): .csv file with annotations
-        verbose (bool, optional): Whether to log info messages. Defaults to True.
+        slide_dir: Directory containing slides
+        project_dir: Directory where the project structure should be created or already exists
+        annotation_file: CSV file with annotations
+        verbose: Whether to log info messages
 
     Returns:
-        Project: Created or loaded project instance
+        Created or loaded project instance.
     """
     vlog = get_vlog(verbose)
     # Many slideflow methods only accept paths in the form of strings
@@ -205,15 +208,24 @@ def setup_dataset(
         preset:  RESOLUTION_PRESETS,
         label_map: dict | list[str],
         slide_dir: Optional[Path] = None,
-        verbose:         bool = True,
+        verbose: bool = True,
         tiff_conversion: bool = False
     ) -> sf.Dataset:
-    """Sets up a comprehensive dataset source for a given resolution preset (tile size and magnification specified) by extracting tiles and generating feature bags
+    """Set up a comprehensive dataset source for a given resolution preset.
+
+    Creates dataset source by extracting tiles and generating feature bags for
+    the specified tile size and magnification.
 
     Args:
-        project (sf.Project): Project instance from which to build dataset source
-        preset (RESOLUTION_PRESETS): Resolution preset containing tile size and magnification
-        verbose (bool, optional): Whether to log info messages. Defaults to True.
+        project: Project instance from which to build dataset source
+        preset: Resolution preset containing tile size and magnification
+        label_map: Dictionary or list containing label mappings
+        slide_dir: Directory containing slide files
+        verbose: Whether to log info messages
+        tiff_conversion: Whether TIFF conversion is required
+
+    Returns:
+        Configured dataset instance.
     """
     global COMMON_MPP_VALUES
     vlog = get_vlog(verbose)
@@ -278,8 +290,22 @@ def extract_tiles(
         dataset: sf.Dataset,
         tiff_conversion: bool = False,
         clear_buffer:    bool = True,
-        verbose:         bool = True
+        verbose: bool = True
 ) -> bool:
+    """Perform tile extraction for a given dataset source.
+
+    Extracts tiles from slides in the dataset. Optionally performs batchwise
+    TIFF conversion beforehand if slides are in unsuitable format.
+
+    Args:
+        dataset: Dataset instance from which to extract tiles
+        tiff_conversion: Whether to perform batchwise TIFF conversion beforehand
+        clear_buffer: Whether to clear the buffer after each batch (only valid with TIFF conversion)
+        verbose: Whether to log progress messages
+
+    Returns:
+        True if tile extraction was successful, False otherwise.
+    """
     vlog = get_vlog(verbose)
     # Default case: no tiff conversion required, slides are already in a suitable format
     if not tiff_conversion:
@@ -335,14 +361,17 @@ def run_dataset_setup_loop(
         label_map: dict | list[str],
         verbose: bool = True
     ) -> dict[RESOLUTION_PRESETS, sf.Dataset]:
-    """Runs the dataset setup loop for all resolution presets defined in RESOLUTION_PRESETS.
+    """Run the dataset setup loop for all resolution presets.
+
+    Creates dataset sources for all resolution presets defined in RESOLUTION_PRESETS.
 
     Args:
-        project (sf.Project): Project instance from which to build dataset sources
-        verbose (bool, optional): Whether to log info messages. Defaults to True.
+        project: Project instance from which to build dataset sources
+        label_map: Dictionary or list containing label mappings
+        verbose: Whether to log info messages
 
     Returns:
-        dict[RESOLUTION_PRESETS, sf.Dataset]: Dictionary containing dataset sources for each resolution preset
+        Dictionary containing dataset sources for each resolution preset.
     """
     dataset_sources = {}
     for preset in RESOLUTION_PRESETS:
@@ -360,13 +389,13 @@ def train(
         k:       int  = 3,
         verbose: bool = True
     ):
-    """Trains models on a k-fold split with using a specific tile size and magnification preset
+    """Train models on a k-fold split using a specific tile size and magnification preset.
 
     Args:
-        project (sf.Project): Project instance
-        dataset (sf.Dataset): dataset source on whicht to train
-        k (int, optional): number of folds. Defaults to 3.
-        verbose (bool, optional): Whether to log info messages. Defaults to True.
+        project: Project instance
+        dataset: Dataset source on which to train
+        k: Number of folds for cross-validation
+        verbose: Whether to log info messages
     """
     global BATCH_SIZE
 
@@ -418,16 +447,19 @@ def train_with_estimate_comparison(
         project:     sf.Project,
         dataset:     sf.Dataset,
         k:           int  = 3,
-        verbose:     bool = True
+        verbose: bool = True
     ):
-    """Trains models on a k-fold split with using a specific tile size and magnification preset.
-    Also compares an estimate of the VRAM usage with the actual VRAM usage during training.
+    """Train models on a k-fold split and compare estimated vs actual VRAM usage.
+
+    Trains models using a specific tile size and magnification preset, while
+    also comparing an estimate of the VRAM usage with the actual VRAM usage during training.
 
     Args:
-        project (sf.Project): Project instance
-        dataset (sf.Dataset): dataset source on whicht to train
-        k (int, optional): number of folds. Defaults to 3.
-        verbose (bool, optional): Whether to log info messages. Defaults to True.
+        model_type: Type of model to train
+        project: Project instance
+        dataset: Dataset source on which to train
+        k: Number of folds for cross-validation
+        verbose: Whether to log info messages
     """
     global BATCH_SIZE
     model_cls = model_type.value
@@ -530,16 +562,22 @@ def run_pipeline(
         label_column:    str,
         k:               int, 
         verbose:         bool = True,
-        cleanup:         bool = False
+        cleanup: bool = False
     ):
-    """Runs the entire AutoMIL pipeline.
+    """Run the entire AutoMIL pipeline.
+
+    Executes the complete pipeline including project setup, dataset preparation,
+    and training loop for all resolution presets.
 
     Args:
-        slide_dir (Path): Directory in which the slides are located
-        project_dir (Path): Directory in which the project structure will be created
-        annotation_file (Path): Path to the datas annotation file
-        verbose (bool, optional): Verbose mode enables additional info messages. Defaults to False.
-        cleanup (bool, optional): Whether to delete the entire project structure afterwards. Defaults to False.
+        slide_dir: Directory containing the slides
+        annotation_file: Path to the data annotation file
+        project_dir: Directory where the project structure will be created
+        patient_column: Name of the patient column in annotations
+        label_column: Name of the label column in annotations
+        k: Number of folds for cross-validation
+        verbose: Whether to enable additional info messages
+        cleanup: Whether to delete the entire project structure afterwards
     """
     sf.setLoggingLevel(20)
 
