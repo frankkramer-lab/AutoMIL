@@ -45,6 +45,7 @@ class RESOLUTION_PRESETS(Enum):
     High  = (299, "20x")
     Ultra = (224, "40x")
 
+# Based on commonly cited microns per pixel (mpp) values for different default magnifications
 COMMON_MPP_VALUES = {
     "20x": 0.5,
     "40x": 0.25,
@@ -65,7 +66,9 @@ LEARNING_RATE: float = 1e-4
 # Batch Size
 BATCH_SIZE: int = 32
 
-MAX_BATCH_SIZE: int = 200  # Maximum batch size for training, used for estimating VRAM usage
+# Maximum Batch size for training, used for estimating VRAM usage
+# Choice of 100 is inspired by https://arxiv.org/abs/2503.10510v1
+MAX_BATCH_SIZE: int = 100
 
 # Number of Epochs
 EPOCHS: int = 40
@@ -73,10 +76,10 @@ EPOCHS: int = 40
 # --- Rich Formatting Colors ---
 
 # Colors for variables in log messages
-INFO_CLR: str = "cyan"        # For general variables and parameters
-SUCCESS_CLR: str = "green"    # For success messages and completed operations
-ERROR_CLR: str = "red"        # For error messages and warnings
-HIGHLIGHT_CLR: str = "yellow" # For highlighting important information
+INFO_CLR:       str = "cyan"       # General purpose  | Variable names and parameters
+SUCCESS_CLR:    str = "green"      # Success Messages | Completed operations
+ERROR_CLR:      str = "red"        # Error Messages   | Warnings
+HIGHLIGHT_CLR:  str = "yellow"     # Highlighting     | Important information
 
 # ----------------------- #
 # --- Utility methods --- #
@@ -145,10 +148,10 @@ def get_slide_magnification(slide_path: str | Path) -> Optional[str]:
         return None
 
 def get_lowest_magnification(slide_dir: Path) -> Optional[str]:
-    """Returns the lowest magnification from a list of slide paths.
+    """Returns the lowest magnification from slides in a directory.
 
     Args:
-        slide_paths (list[str]): List of slide paths
+        slide_dir (Path): Path to directory containing slide files
 
     Returns:
         Optional[str]: Lowest magnification as string or None if no valid magnification found
@@ -167,10 +170,10 @@ def get_mpp_from_slide(slide_path: Path) -> Optional[float]:
     Extract microns per pixel (MPP) from a slide file using OpenSlide.
 
     Args:
-        slide_path (str): Path to the slide file (.svs, .tiff, etc.)
+        slide_path (Path): Path to the slide file (.svs, .tiff, etc.)
 
     Returns:
-        Tuple[float, float]: (mpp_x, mpp_y) if available, else None
+        Optional[float]: MPP value if available, else None
     """
     try:
         slide = openslide.OpenSlide(slide_path)
@@ -186,6 +189,7 @@ def calculate_average_mpp(slide_dir: Path, return_rounded: bool = True) -> Optio
 
     Args:
         slide_dir (Path): Path to the directory containing slide files.
+        return_rounded (bool): Whether to round the result to 2 decimal places (default True).
 
     Returns:
         Optional[float]: Average MPP if available, else None.
@@ -257,7 +261,7 @@ def get_bag_avg_and_num_features(bags_dir: Path) -> tuple[int, int]:
         ValueError: If no valid .pt feature bags are found in the specified directory.
 
     Returns:
-        int: Tuple containing the average number of tiles per bag and the number of features per tile.
+        tuple[int, int]: Tuple containing the average number of tiles per bag and the number of features per tile.
     """
     num_tiles = []
     num_features = 0
@@ -284,7 +288,7 @@ def get_unique_labels(annotations_file: Path, label_column: str) -> list[str]:
         label_column (str):      Name of the column containing labels.
 
     Returns:
-        set: List of unique labels found in the specified column.
+        list[str]: List of unique labels found in the specified column.
     """
     annotations = pd.read_csv(annotations_file)
     return [str(label) for label in annotations[label_column].dropna().unique()]
@@ -310,7 +314,7 @@ def batch_generator(input_list: list[T], batch_size: int) -> Generator[list[T], 
 
 # --- PNG -> TIFF Conversion ---
 
-def convert_img_to_tiff(in_path: Path, out_path: Path) -> str | bool:
+def convert_img_to_tiff(in_path: Path, out_path: Path) -> str:
     """Converts a given image into a .tiff file
 
     Args:
@@ -318,7 +322,7 @@ def convert_img_to_tiff(in_path: Path, out_path: Path) -> str | bool:
         out_path (Path):    Output path to where to save the converted .tiff to
     
     Returns:
-        str: error message in case of failure or an empty string in case of success
+        str: Error message in case of failure or an empty string in case of success
     """
     try:
         image = pyvips.Image.new_from_file(in_path)

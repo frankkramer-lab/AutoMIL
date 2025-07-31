@@ -34,6 +34,9 @@ def configure_image_backend(verbose: bool = True):
     
     Args:
         verbose (bool, optional): Whether to log info messages. Defaults to True.
+        
+    Returns:
+        None
     """
     vlog = get_vlog(verbose)
     system = platform.system().lower()
@@ -74,7 +77,8 @@ def setup_annotations(
         Exception: If unable to create the modified annotation file
 
     Returns:
-        Path: Path to modified annotations file (project_dir/annotations.csv)
+        tuple[Path, dict | list[str]]: Tuple containing the path to modified annotations file 
+                                      (project_dir/annotations.csv) and the label mapping
     """
     vlog = get_vlog(verbose)
     annotations = pd.read_csv(annotations_file, index_col=patient_column)
@@ -130,10 +134,12 @@ def create_project_scaffold(
         patient_column (str): Column name containing patient identifiers (Will be renamed to 'patient')
         label_column (str): Column name containing labels (Will be renamed to 'label')
         slide_column (Optional[str], optional): Column name containing slide identifiers (Will be renamed to 'slide'). Defaults to None.
+        transform_labels (bool, optional): Whether to transform labels to float values. Defaults to True.
         verbose (bool, optional): Whether to log info messages. Defaults to True.
     
     Returns:
-        modified_annotations (Path): Path to the modified annotations file (*project_dir/annotations.csv*)
+        tuple[Path, dict | list[str]]: Tuple containing the path to the modified annotations file 
+                                      (*project_dir/annotations.csv*) and the label mapping
     """
     vlog = get_vlog(verbose)
     # Simple project directory creation

@@ -21,7 +21,7 @@ def estimate_TransMIL_memory_usage(input_size: Tuple[int, int, int]) -> float:
     Assumes activations are stored as float32 (4 bytes per value).
 
     Args:
-        input_size (tuple[int, int, int]): A tuple (B, N, C) representing:
+        input_size (Tuple[int, int, int]): A tuple (B, N, C) representing:
             - B: batch size (number of bags)
             - N: number of instances (patches) per bag
             - C: feature dimension of each instance (e.g., 1024)
@@ -72,7 +72,7 @@ def estimate_dynamic_vram_usage(
     return_rounded: bool = True
 ) -> float:
     """
-    Estimate the approximate VRAM usage dynamically (in mb) for a given torch module.
+    Estimate the approximate VRAM usage dynamically (in MB) for a given torch module.
 
     Args:
         model_cls (Type[nn.Module]): The MIL model class (e.g., TransMIL).
@@ -80,9 +80,10 @@ def estimate_dynamic_vram_usage(
         tiles_per_bag (int): Number of tiles per bag/sample (default 100).
         batch_size (int): Number of samples per batch (default 4).
         num_classes (int): Number of output classes for the model. This should be 2.
+        return_rounded (bool): Whether to round the result to 2 decimal places (default True).
 
     Returns:
-
+        float: Estimated VRAM usage in megabytes (MB).
     """
     # Initiate Model and set it to evaluation mode
     try:
