@@ -1,9 +1,11 @@
+from typing import Any, Tuple, Type
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 
-from typing import Tuple, Any, Type
-from utils import get_gpu_memory
+from utils import MAX_BATCH_SIZE, get_gpu_memory
+
 
 def estimate_TransMIL_memory_usage(input_size: Tuple[int, int, int]) -> float:
     """
@@ -83,11 +85,15 @@ def estimate_dynamic_vram_usage(
 
     """
     # Initiate Model and set it to evaluation mode
-    model: nn.Module = model_cls(n_feats=input_dim, n_out=num_classes)
+    try:
+        model: nn.Module = model_cls(n_feats=input_dim, n_out=num_classes).cuda()
+    except TypeError:
+        model: nn.Module = model_cls()
     model.eval()
 
     # Dummy input tensor for dry run
-    dummy_input: torch.Tensor = torch.randn(batch_size, tiles_per_bag, input_dim)
+    dummy_input: torch.Tensor = torch.randn(batch_size, tiles_per_bag, input_dim).cuda()
+    lens = torch.tensor([tiles_per_bag] * batch_size).cuda()
 
     output_sizes: list[int] = []
 
@@ -111,7 +117,7 @@ def estimate_dynamic_vram_usage(
     # Dry run
     # TODO | Check time requirements
     with torch.no_grad():
-        model(dummy_input)
+        model(dummy_input, lens)
 
     # Removing hooks
     # TODO | Check if necessary
@@ -120,7 +126,11 @@ def estimate_dynamic_vram_usage(
 
     # sum of output sizes in Mb
     output_sum = sum(output_sizes) * 4 / (1024 ** 2)
-    return round(output_sum) if return_rounded else output_sum
+    param_mem = sum(p.numel() for p in model.parameters()) * 4 / (1024**2)
+    buffer_mem = sum(b.numel() for b in model.buffers()) * 4 / (1024**2)
+    input_mem = dummy_input.numel() * 4 / (1024**2) + lens.numel() * 4 / (1024**2)
+    sum_mem = output_sum + param_mem + buffer_mem + input_mem
+    return round(sum_mem, 2) if return_rounded else sum_mem
 
 def adjust_batch_size(
     model_cls: Type[nn.Module],
@@ -141,6 +151,8 @@ def adjust_batch_size(
     Returns:
         int: Batch size adjusted to available memory
     """
+    global MAX_BATCH_SIZE
+    
     # Get estimated memory usage of model and free memory (both in Mb)
     estimated_mem_usage = estimate_dynamic_vram_usage(
         model_cls,
@@ -149,13 +161,15 @@ def adjust_batch_size(
         initial_batch_size
     )
     free_mem = get_gpu_memory()["free_MB"]
+    batch_size_limit = min(
+        num_slides // 2,
+        MAX_BATCH_SIZE
+    )
 
-    # Upper bound on batch size is 5% of whole dataset
-    max_batch_size = num_slides * 0.05
     # Adjust batch size according to free memory (with upper bound in mind)
     adjusted_batch_size = min(
         round(free_mem / estimated_mem_usage) * initial_batch_size, 
-        max_batch_size
+        batch_size_limit
     )
 
     return int(adjusted_batch_size)

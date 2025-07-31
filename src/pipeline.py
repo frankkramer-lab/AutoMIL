@@ -8,17 +8,22 @@ from typing import Optional
 
 import pandas as pd
 import slideflow as sf
+import torch
 from slideflow.mil import mil_config, train_mil
 from slideflow.mil.models import TransMIL
 from slideflow.slide import qc
 from slideflow.util import is_project, log
 
-from estimator import adjust_batch_size
-from utils import (BATCH_SIZE, EPOCHS, FEATURE_EXTRACTOR, LEARNING_RATE,
-                   RESOLUTION_PRESETS, get_num_slides)
+from estimator import adjust_batch_size, estimate_dynamic_vram_usage
+from utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, FEATURE_EXTRACTOR,
+                   LEARNING_RATE, RESOLUTION_PRESETS, ModelType,
+                   INFO_CLR, SUCCESS_CLR, ERROR_CLR,
+                   batch_conversion_concurrent, batch_generator,
+                   calculate_average_mpp, get_bag_avg_and_num_features,
+                   get_num_slides, get_unique_labels, get_vlog)
 
 
-def configure_image_backend(png_slides_present: bool, verbose: bool = True):
+def configure_image_backend(verbose: bool = True):
     """Selects the image backend based on the systems operating system
 
     During tiling, cucim and openslide create new processes/threads through 'forking'. \\
@@ -30,25 +35,16 @@ def configure_image_backend(png_slides_present: bool, verbose: bool = True):
     Args:
         verbose (bool, optional): Whether to log info messages. Defaults to True.
     """
-    # neither cucim nor openslide are capable of working with .png slides
-    if png_slides_present:
-        if verbose:
-            log.info("Using [cyan]openslide[/] as some or all slides are in .png format")
-        os.environ["SF_SLIDE_BACKEND"] = "openslide"
-        return
-    
+    vlog = get_vlog(verbose)
     system = platform.system().lower()
     if system == "windows":
-        if verbose:
-            log.info("Using [cyan]libvips[/] backend on Windows")
+        vlog(f"Using [{INFO_CLR}]libvips[/] backend on Windows")
         os.environ["SF_SLIDE_BACKEND"] = "libvips"
     elif system == "linux":
-        if verbose:
-            log.info("Using [cyan]cucim[/] backend on Linux")
+        vlog(f"Using [{INFO_CLR}]cucim[/] backend on Linux")
         os.environ["SF_SLIDE_BACKEND"] = "cucim"
     else:
-        if verbose:
-            log.error(f"Unsupported OS: [red]{system}[/]")
+        vlog(f"Unsupported OS: [{ERROR_CLR}]{system}[/]")
         sys.exit(1)
 
 def setup_annotations(
@@ -57,7 +53,9 @@ def setup_annotations(
         label_column:     str,
         project_dir:      Path,
         slide_column:     Optional[str] = None,
-    ) -> Path:
+        transform_labels: bool = True,
+        verbose:          bool = True
+    ) -> tuple[Path, dict | list[str]]:
     """Modifies a given annotations file to conform to slideflows expected format
 
     NOTE:
@@ -69,6 +67,8 @@ def setup_annotations(
         patient_column (str): Name of the column containing patient identifiers (Will be renamed to 'patient')
         label_column (str): Name of the column containing labels (Will be renamed to 'label')
         project_dir (Path): Directory in which the project structure will be created (modified annotations will be stored here)
+        slide_column (Optional[str], optional): Name of the column containing slide identifiers (Will be renamed to 'slide'). Defaults to None.
+        transform_labels (bool, optional): Whether to transform labels to float values. Defaults to True.
 
     Raises:
         Exception: If unable to create the modified annotation file
@@ -76,27 +76,93 @@ def setup_annotations(
     Returns:
         Path: Path to modified annotations file (project_dir/annotations.csv)
     """
+    vlog = get_vlog(verbose)
     annotations = pd.read_csv(annotations_file, index_col=patient_column)
+
+    # Loaded patients as index so we have to change the name attribute
     annotations.index.name = "patient"
-    annotations.rename(columns={label_column: "label"}, inplace=True)
-    if slide_column:
-        annotations.rename(columns={slide_column: "slide"}, inplace=True)
+    # If no slide column is provided, we copy the index to a new column
+    if not slide_column:
+        annotations["slide"] = annotations.index
+    # Rename columns to conform to slideflow's expectations
+    column_renames = {
+        label_column: "label",
+        **({slide_column: "slide"} if slide_column else {})
+    }
+    annotations.rename(columns=column_renames, inplace=True)
+    # Transform labels to float values
+    if transform_labels:
+        label_map = {
+            label: float(index) for index, label in enumerate(annotations["label"].unique())
+        }
+        annotations["label"] = annotations["label"].map(label_map)
+        vlog(f"Transformed labels to float values: [{INFO_CLR}]{', '.join([f'{k}: {v}' for k, v in label_map.items()])}[/]")
+    else:
+        label_map = [label for label in annotations["label"].dropna().unique()]
+    
+    
+    # Save the modified annotations to the project directory
     annotation_file = project_dir / "annotations.csv"
     annotations.to_csv(annotation_file, index=True)
+    # Error handling
     if not annotation_file.exists():
         raise Exception(f"Annotation file [bold]{annotation_file}[/] could not be created.")
     if not annotations.empty:
-        log.info(f"Annotations saved to [bold]{annotation_file}[/]")
+        log.info(f"Annotations saved to [{SUCCESS_CLR}]{annotation_file}[/]")
 
-    return annotation_file  
+    return annotation_file, label_map
+
+def create_project_scaffold(
+        project_dir: Path,
+        annotations_file: Path,
+        patient_column: str,
+        label_column: str,
+        slide_column: Optional[str] = None,
+        transform_labels: bool = True,
+        verbose: bool = True
+    ) -> tuple[Path, dict | list[str]]:
+    """Sets up a simple project directory structure with an annotations file. Creates the *project_dir* folder if it does not exist.
+    saves a modified version of the annotations file to *project_dir/annotations.csv* if it does not exist.
+
+    Args:
+        project_dir (Path): Path to the project directory
+        annotations_file (Path): Path to the annotations file in .csv format
+        patient_column (str): Column name containing patient identifiers (Will be renamed to 'patient')
+        label_column (str): Column name containing labels (Will be renamed to 'label')
+        slide_column (Optional[str], optional): Column name containing slide identifiers (Will be renamed to 'slide'). Defaults to None.
+        verbose (bool, optional): Whether to log info messages. Defaults to True.
+    
+    Returns:
+        modified_annotations (Path): Path to the modified annotations file (*project_dir/annotations.csv*)
+    """
+    vlog = get_vlog(verbose)
+    # Simple project directory creation
+    if not project_dir.exists():
+        project_dir.mkdir(parents=True, exist_ok=True)
+        vlog(f"Created project directory at [{SUCCESS_CLR}]{project_dir}[/]")
+    else:
+        vlog(f"Project directory [{INFO_CLR}]{project_dir}[/] already exists")
+    
+    # Annotations file setup
+    if (annotations := project_dir / "annotations.csv") in project_dir.iterdir():
+        vlog(f"Annotations file [{INFO_CLR}]{annotations}[/] already exists")
+        return annotations, get_unique_labels(annotations, label_column)
+    else:
+        modified_annotations, label_map = setup_annotations(
+            annotations_file,
+            patient_column,
+            label_column,
+            project_dir,
+            slide_column,
+            transform_labels
+        )
+        vlog(f"Modified annotations saved to [{SUCCESS_CLR}]{modified_annotations}[/]")
+        return modified_annotations, label_map
 
 def setup_project(
         slide_dir:       Path,
-        annotation_file: Path,
         project_dir:     Path,
-        patient_column:  str,
-        label_column:    str,
-        slide_column:    Optional[str] = None,
+        annotation_file: Path,
         verbose:         bool = True
     ) -> sf.Project:
     """Sets up the project structure in *project_dir* or loads it into a Project Instance, if it already exists
@@ -110,72 +176,87 @@ def setup_project(
     Returns:
         Project: Created or loaded project instance
     """
+    vlog = get_vlog(verbose)
     # Many slideflow methods only accept paths in the form of strings
     project_dir_str = str(project_dir)
 
     if is_project(project_dir_str):
-        if verbose:
-            log.info(f"[bold]{project_dir}[/] is already a project. Loaded")
+        vlog(f"[{INFO_CLR}]{project_dir}[/] is already a project. Loaded")
         return sf.load_project(project_dir_str)
-    elif not project_dir.exists():
-        project_dir.mkdir()
 
-    if not (annotations := Path(annotation_file)).suffix == ".csv":
-        raise Exception(f"[red]{annotation_file}[/] is not a valid annotations file (not in .csv format)")
-
-    # Might raise another Exception
-    modified_annotations = setup_annotations(
-        annotations,
-        patient_column,
-        label_column,
-        Path(project_dir),
-        slide_column
-    )
-
-    if verbose:
-        log.info(f"Creating project at [bold]{project_dir}[/]")
+    vlog(f"Creating project at [{INFO_CLR}]{project_dir}[/]")
     project = sf.create_project(
         name="AutoMIL",
         root=project_dir_str,
         slides=str(slide_dir),
-        annotations=str(modified_annotations)
+        annotations=str(annotation_file)
     )
 
-    # Overwrite placeholder annotations
-    shutil.copy(annotation_file, project_dir / annotation_file.name)
     return project
-
 
 def setup_dataset(
         project: sf.Project,
         preset:  RESOLUTION_PRESETS,
-        verbose: bool = True
+        label_map: dict | list[str],
+        slide_dir: Optional[Path] = None,
+        verbose:         bool = True,
+        tiff_conversion: bool = False
     ) -> sf.Dataset:
-    """Sets up a comprehensive dataset source for a given tile size and magnification by extracting tiles and generating feature bags
+    """Sets up a comprehensive dataset source for a given resolution preset (tile size and magnification specified) by extracting tiles and generating feature bags
 
     Args:
         project (sf.Project): Project instance from which to build dataset source
         preset (RESOLUTION_PRESETS): Resolution preset containing tile size and magnification
         verbose (bool, optional): Whether to log info messages. Defaults to True.
     """
+    global COMMON_MPP_VALUES
+    vlog = get_vlog(verbose)
     # the .value of a preset is a tuple of tile size (int) and a magnification (str)
     tile_size, magnification = preset.value
-    dataset = project.dataset(tile_size, magnification)
+
+    # Calulcate microns per tile (pixels per tile * microns per pixel)
+    mpp = None
+    if slide_dir:
+        mpp = calculate_average_mpp(slide_dir)
+        vlog(f"Calculated average microns per pixel (MPP) of [{INFO_CLR}]{mpp}[/] for slides in [{INFO_CLR}]{slide_dir}[/]")
+    if mpp is None:
+        vlog(f"Using default MPP value of [{INFO_CLR}]{COMMON_MPP_VALUES.get(magnification, 0.5)}[/] for magnification [{INFO_CLR}]{magnification}[/]")
+        mpp = COMMON_MPP_VALUES.get(magnification, 0.5)
+    tile_um = int(tile_size * mpp)
+
+    # adjust filters to labels
+    match label_map:
+        # dict with (original label: float transformed label) key value pairs
+        case dict():
+            unique_labels = list(label_map.values())
+        # plain list of unique labels
+        case list():
+            unique_labels = label_map
+        # None or empty list (should not happen but is here for completeness)
+        case _:
+            unique_labels = None
+
+    filters = {"label": unique_labels} if unique_labels else None
+    vlog(f"Using filter [{INFO_CLR}]{filters}[/] for dataset")
+    dataset = project.dataset(
+        tile_size,
+        tile_um,
+        # slideflow needs this to recognize these values as classes
+        filters= {"label": unique_labels} if unique_labels else None,
+    )
     project_path = Path(project.root)
     bags_path    = project_path / "bags"
 
     # tiles will be stored in project/tfrecords/{tile_size}px{magnification}x/...
-    if verbose:
-        log.info(f"Extracting tiles at {magnification} | Tile size: {tile_size}")
-    dataset.extract_tiles(
-        qc=qc.Otsu(),
-        normalizer="reinhard_mask",
-        report=True
+    vlog(f"Extracting tiles at [{INFO_CLR}]{magnification}[/] | Tile size: [{INFO_CLR}]{tile_size}[/]")
+    extract_tiles(
+        dataset,
+        tiff_conversion=tiff_conversion,
+        clear_buffer=True
     )
 
     # bags will be stored in project/bags/...
-    if verbose:
-        log.info("Generating feature bags...")
+    vlog("Generating feature bags...")
     extractor = sf.build_feature_extractor(
         name=FEATURE_EXTRACTOR,
         resize=224
@@ -186,6 +267,86 @@ def setup_dataset(
     )
 
     return dataset
+
+def extract_tiles(
+        dataset: sf.Dataset,
+        tiff_conversion: bool = False,
+        clear_buffer:    bool = True,
+        verbose:         bool = True
+) -> bool:
+    vlog = get_vlog(verbose)
+    # Default case: no tiff conversion required, slides are already in a suitable format
+    if not tiff_conversion:
+        try:
+            dataset.extract_tiles(
+                qc=qc.Otsu(),
+                normalizer="reinhard_mask",
+                report=True
+            )
+            return True
+        except Exception as e:
+            log.error(f"Error extracting tiles: {e}")
+            return False
+    # Exception: tiff conversion required, slides are in unsuitable format (e.g .png)
+    else:
+        slide_list = [Path(slide) for slide in dataset.slide_paths()]
+        tfrecords_path = Path(dataset.tfrecords_folders()[0])  # Should be project_dir / tfrecords / {tile_size}px{magnification}x
+        batch_size = 10
+        
+        vlog(f"Converting slides to TIFF format in batches of [{INFO_CLR}]{batch_size}[/] slides")
+
+        for batch_idx, batch in enumerate(batch_generator(slide_list, batch_size=batch_size)):
+            vlog(f"Processing batch [{INFO_CLR}]{batch_idx + 1}/{len(slide_list) // batch_size + 1}[/] with [{INFO_CLR}]{len(batch)}[/] slides")
+            # Multithreaded .png -> .tiff conversion
+            batch_conversion_concurrent(
+                batch,
+                Path(dataset.tfrecords_folders()[0]) # Should be project_dir / tfrecords / {tile_size}px{magnification}x
+            )
+            vlog(f"Converted [{SUCCESS_CLR}]{len(batch)}[/] slides to TIFF format")
+
+            # Tile extraction for batch
+            try:
+                dataset.extract_tiles(
+                    slides=batch,
+                    qc=qc.Otsu(),   
+                    normalizer="reinhard_mask", 
+                )
+            except Exception as e:
+                log.error(f"Error extracting tiles for batch {batch_idx}: {e}")
+                return False
+            
+            # Cleans up the current .tiff buffer after each batch
+            if clear_buffer:
+                for tiff in [file for file in tfrecords_path.iterdir() if file.suffix == ".tiff"]:
+                    try:
+                        tiff.unlink()
+                    except Exception as e:
+                        log.error(f"Error deleting TIFF file {tiff}: {e}")
+        return True
+
+def run_dataset_setup_loop(
+        project: sf.Project,
+        label_map: dict | list[str],
+        verbose: bool = True
+    ) -> dict[RESOLUTION_PRESETS, sf.Dataset]:
+    """Runs the dataset setup loop for all resolution presets defined in RESOLUTION_PRESETS.
+
+    Args:
+        project (sf.Project): Project instance from which to build dataset sources
+        verbose (bool, optional): Whether to log info messages. Defaults to True.
+
+    Returns:
+        dict[RESOLUTION_PRESETS, sf.Dataset]: Dictionary containing dataset sources for each resolution preset
+    """
+    dataset_sources = {}
+    for preset in RESOLUTION_PRESETS:
+        start_time = time.time()
+        dataset = setup_dataset(project, preset, label_map, verbose=verbose)
+        if verbose:
+            log.info(f"[{SUCCESS_CLR}]Finished creating a [{INFO_CLR}]{preset.name}[/] resolution dataset source[/] in [{INFO_CLR}]{time.time() - start_time:.1f}[/] seconds\n")
+        dataset_sources[preset] = dataset
+    
+    return dataset_sources
 
 def train(
         project: sf.Project,
@@ -235,8 +396,8 @@ def train(
 
     for i, (train, val) in enumerate(dataset.kfold_split(k, labels="label")):
         if verbose:
-            log.info(f"Training fold {i+1}/5")
-        train_mil(
+            log.info(f"Training fold [{INFO_CLR}]{i+1}/5[/]")
+        learner = train_mil(
             config=config,
             train_dataset=train,
             val_dataset=val,
@@ -245,6 +406,115 @@ def train(
             bags=str(bags_path),
             outdir=str(model_path)
         )
+
+def train_with_estimate_comparison(
+        model_type:  ModelType,
+        project:     sf.Project,
+        dataset:     sf.Dataset,
+        k:           int  = 3,
+        verbose:     bool = True
+    ):
+    """Trains models on a k-fold split with using a specific tile size and magnification preset.
+    Also compares an estimate of the VRAM usage with the actual VRAM usage during training.
+
+    Args:
+        project (sf.Project): Project instance
+        dataset (sf.Dataset): dataset source on whicht to train
+        k (int, optional): number of folds. Defaults to 3.
+        verbose (bool, optional): Whether to log info messages. Defaults to True.
+    """
+    global BATCH_SIZE
+    model_cls = model_type.value
+    vlog = get_vlog(verbose)
+
+    # Coniguring some paths
+    project_path = Path(project.root)
+    bags_path  = project_path / "bags"
+    model_path = project_path / "models"
+
+    # Get average number of tiles per bag and number of features per tile
+    tiles_per_bag, input_dim = get_bag_avg_and_num_features(bags_path)
+    vlog(f"Dataset slide paths: [{INFO_CLR}]{dataset.slide_paths()}[/]")
+    adjusted_batch_size = adjust_batch_size(
+        model_cls,
+        BATCH_SIZE,
+        get_num_slides(dataset),
+        input_dim,
+        tiles_per_bag
+    )
+    vlog(f"Adjusted batch size to [{SUCCESS_CLR}]{adjusted_batch_size}[/] for model [{INFO_CLR}]{model_cls.__name__}[/]")
+    # Estimate memory
+    estimated_mem_mb = estimate_dynamic_vram_usage(
+        model_cls=model_cls,
+        input_dim=input_dim,
+        tiles_per_bag=tiles_per_bag,
+        batch_size=adjusted_batch_size,
+        num_classes=2,
+        return_rounded=False
+    )
+
+    config = mil_config(
+        model="attention_mil",
+        trainer="fastai",
+        lr=LEARNING_RATE,
+        epochs=EPOCHS,
+        batch_size=adjusted_batch_size,
+        fit_one_cycle=True,
+    )
+
+    if k == 1:
+        train, val = dataset.split(
+            labels="label",
+            val_fraction=0.2
+        )
+        folds = [(train, val)]
+    else:
+        folds = [(train, val) for train, val in dataset.kfold_split(k, labels="label")]
+
+    for i, (train, val) in enumerate(folds):
+        vlog(f"Training fold [{INFO_CLR}]{i+1}/5[/]")
+
+        # Clear cuda cache befor training
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+
+        learner = train_mil(
+            config=config,
+            train_dataset=train,
+            val_dataset=val,
+            outcomes="label",
+            project=project,
+            bags=str(bags_path),
+            outdir=str(model_path)
+        )
+
+        # Extract trained model
+        model = learner.model
+        if isinstance(model, torch.nn.Module):
+            model = model.eval().cuda()
+            model_cls = type(model)
+        else:
+            raise TypeError(f"Recived an invalid model {type(model)}")
+
+        # Actual inference memory tracking
+        # Create dummy input
+        dummy_input = torch.randn(BATCH_SIZE, tiles_per_bag, input_dim).cuda()
+        lens = torch.full((BATCH_SIZE,), tiles_per_bag, dtype=torch.int32).cuda()
+
+        torch.cuda.reset_peak_memory_stats()
+        with torch.no_grad():
+            _ = model(dummy_input, lens)
+        actual_mem_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
+
+        log.info(
+            f"Fold [{INFO_CLR}]{i+1}[/]: Estimated VRAM = [{INFO_CLR}]{estimated_mem_mb:.2f}[/] MB | "
+            f"Actual Peak VRAM = [{INFO_CLR}]{actual_mem_mb:.2f}[/] MB"
+        )
+
+        # Cleanup
+        # TODO | Check if this is necessary
+        del model, dummy_input, learner
+        torch.cuda.empty_cache()
 
 def run_pipeline(
         slide_dir:       Path,
@@ -274,7 +544,7 @@ def run_pipeline(
     
     # --- Project Setup ---
     try:
-        project = setup_project(slide_dir, annotation_file, project_dir, patient_column, label_column)
+        project = setup_project(slide_dir, project_dir, annotation_file, verbose=verbose)
     except Exception as err:
         log.error(err)
         sys.exit(1)
@@ -282,16 +552,18 @@ def run_pipeline(
     # --- Dataset Preparation and Training Loop
     for preset in RESOLUTION_PRESETS:
         start_time = time.time()
-        dataset = setup_dataset(project, preset, verbose=verbose)
-        log.info(f"[green]Finished creating a {preset.name} resolution dataset source[/] in {time.time() - start_time:.1f} seconds\n")
+        #dataset = setup_dataset(project, preset, verbose=verbose)
+        log.info(f"[{SUCCESS_CLR}]Finished creating a [{INFO_CLR}]{preset.name}[/] resolution dataset source[/] in [{INFO_CLR}]{time.time() - start_time:.1f}[/] seconds\n")
 
         """
         start_time = time.time()
         train(project, dataset, k, verbose=verbose)
-        log.info(f"[green]Finished training {k} models on {preset.name} resolution dataset source[/] in {time.time() - start_time:.1f} seconds\n")
+        log.info(f"[{SUCCESS_CLR}]Finished training [{INFO_CLR}]{k}[/] models on [{INFO_CLR}]{preset.name}[/] resolution dataset source[/] in [{INFO_CLR}]{time.time() - start_time:.1f}[/] seconds\n")
         """
 
     # --- Cleanup ---
     if cleanup:
-        log.info(f"Cleaning up [bold]{project_dir}[/]")
+        log.info(f"Cleaning up [{INFO_CLR}]{project_dir}[/]")
+        shutil.rmtree(project_dir)
+        shutil.rmtree(project_dir)
         shutil.rmtree(project_dir)
