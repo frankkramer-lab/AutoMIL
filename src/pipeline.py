@@ -22,7 +22,6 @@ from utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, FEATURE_EXTRACTOR,
                    calculate_average_mpp, get_bag_avg_and_num_features,
                    get_num_slides, get_unique_labels, get_vlog)
 
-
 def configure_image_backend(verbose: bool = True):
     """Select the image backend based on the system's operating system.
 
@@ -228,6 +227,7 @@ def setup_dataset(
         Configured dataset instance.
     """
     global COMMON_MPP_VALUES
+
     vlog = get_vlog(verbose)
     # the .value of a preset is a tuple of tile size (int) and a magnification (str)
     tile_size, magnification = preset.value
@@ -472,7 +472,6 @@ def train_with_estimate_comparison(
 
     # Get average number of tiles per bag and number of features per tile
     tiles_per_bag, input_dim = get_bag_avg_and_num_features(bags_path)
-    vlog(f"Dataset slide paths: [{INFO_CLR}]{dataset.slide_paths()}[/]")
     adjusted_batch_size = adjust_batch_size(
         model_cls,
         BATCH_SIZE,
@@ -525,7 +524,11 @@ def train_with_estimate_comparison(
             bags=str(bags_path),
             outdir=str(model_path)
         )
-
+        
+        # Examine entire learner object
+        for attr in dir(learner):
+            log.info(f"learner.{attr} = {getattr(learner, attr)}")
+        
         # Extract trained model
         model = learner.model
         if isinstance(model, torch.nn.Module):
@@ -608,6 +611,4 @@ def run_pipeline(
     # --- Cleanup ---
     if cleanup:
         log.info(f"Cleaning up [{INFO_CLR}]{project_dir}[/]")
-        shutil.rmtree(project_dir)
-        shutil.rmtree(project_dir)
         shutil.rmtree(project_dir)
