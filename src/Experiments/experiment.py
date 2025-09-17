@@ -151,16 +151,16 @@ class Experiment(ABC):
 
         # Dirty trick to satisfy the type checker
         figures = cast(
-            list[Figure],
-            [
-                plot_method()
+            dict[str, Figure],
+            {
+                method_name.removeprefix('_plot_'): plot_method()
                 for method_name in dir(self)
                 if (
                     method_name.startswith('_plot_')
                     and callable((plot_method := getattr(self, method_name)))
                     and get_return_type(plot_method) == Figure
                 )
-            ]
+            }
         )
 
         # Set up plotting style
@@ -168,8 +168,8 @@ class Experiment(ABC):
         sns.set_palette("husl")
 
         # Save figures
-        for index, figure in enumerate(figures):
-            plot_path = self.results_dir / f"{self.experiment_name}_plot_{index + 1}.png"
+        for method_name, figure in figures.items():
+            plot_path = self.results_dir / f"{method_name}.png"
             figure.savefig(
                 plot_path,
                 bbox_inches='tight',
@@ -522,12 +522,13 @@ class BatchSizeExperiment(Experiment):
         ax.set_xlabel("Batch Size")
         ax.set_ylabel("Performance Metric")
 
-        # Plotting each performance metric
-        for metric, values in self.performance_metrics.items():
-            if not isinstance(values, list):
-                continue
-            ax.plot(self.batch_sizes, values, label=metric)
+        # Extract average validation accuracy for each batch size
+        performances = [
+            metrics.get('avg_val_accuracy', 0)
+            for metrics in self.performance_metrics.values()
+        ]
 
+        ax.plot(self.batch_sizes, performances, marker='o', label='Avg Val Accuracy')
         ax.legend()
         return fig
     
@@ -538,6 +539,7 @@ class BatchSizeExperiment(Experiment):
         ax.set_xlabel("Batch Size")
         ax.set_ylabel("Memory Usage (MB)")
 
+        # Extract average memory usage for each batch size
         memory_usages = [
             metrics.get('avg_memory_usage_mb', 0) 
             for metrics in self.performance_metrics.values()
@@ -554,6 +556,7 @@ class BatchSizeExperiment(Experiment):
         ax.set_xlabel("Batch Size")
         ax.set_ylabel("Total Training Time (s)")
 
+        # Extract total training time for each batch size
         training_times = [
             metrics.get('total_training_time', 0) 
             for metrics in self.performance_metrics.values()

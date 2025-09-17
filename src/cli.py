@@ -9,10 +9,10 @@ import click
 import slideflow as sf
 from slideflow import Dataset, Project
 
+from Experiments.experiment import BatchSizeExperiment
 from pipeline import (configure_image_backend, create_project_scaffold,
                       run_dataset_setup_loop, setup_dataset, setup_project,
                       train_with_estimate_comparison)
-from Experiments.experiment import BatchSizeExperiment
 from utils import RESOLUTION_PRESETS, ModelType
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -105,13 +105,13 @@ def run_pipeline(
 @click.argument("slide_dir",        type=click.Path(exists=True, file_okay=False))
 @click.argument("annotation_file",  type=click.Path(exists=True, file_okay=True))
 @click.argument("project_dir",      type=click.Path(file_okay=False))
-@click.option("-pc", "--patient_column", type=str, default="patient", help="Name of the column containing patient IDs")
-@click.option("-lc", "--label_column",   type=str, default="label",   help="Name of the column containing labels")
-@click.option("-sc", "--slide_column",   type=str, default=None,      help="Name of the column containing slide names")
-@click.option("-bs", "--batch_sizes",    type=str, default="2,4,8,16,32", help="Comma-separated list of batch sizes to test")
-@click.option("-k",                      type=int, default=3,         help="Number of folds to train per batch size")
-@click.option("-t", "--transform_labels", is_flag=True,                 help="Transforms labels to float values (0.0, 1.0, ...)")
-@click.option("-v", "--verbose",          is_flag=True,                 help="Enables additional logging messages")
+@click.option("-pc", "--patient_column",  type=str, default="patient",     help="Name of the column containing patient IDs")
+@click.option("-lc", "--label_column",    type=str, default="label",       help="Name of the column containing labels")
+@click.option("-sc", "--slide_column",    type=str, default=None,          help="Name of the column containing slide names")
+@click.option("-bs", "--batch_sizes",     type=str, default="2,4,8,16,32", help="Comma-separated list of batch sizes to test")
+@click.option("-k",                       type=int, default=3,             help="Number of folds to train per batch size")
+@click.option("-t", "--transform_labels", is_flag=True,                   help="Transforms labels to float values (0.0, 1.0, ...)")
+@click.option("-v", "--verbose",          is_flag=True,                   help="Enables additional logging messages")
 def batch_analysis(
     slide_dir:       str,
     annotation_file: str,
