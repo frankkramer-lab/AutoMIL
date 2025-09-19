@@ -3,6 +3,8 @@
 
 AutoMIL provides a flexible framework for training and evaluating Multiple Instance Learning models for the task of image classification on Whole Slide Image (WSI) datasets.
 
+![Pipeline](data/Dia.png)
+
 ## Features
 
 - **Automated Pipeline**: Complete automated workflow encompassing preprocessing, training and evalutuation
