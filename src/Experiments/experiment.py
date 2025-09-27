@@ -20,7 +20,7 @@ from fastai.learner import Learner
 from matplotlib.figure import Figure
 from slideflow.mil import mil_config, train_mil
 
-from estimator import estimate_dynamic_vram_usage
+from estimator import SizeEstimatorHooks, measure_vram_usage
 from utils import (BATCH_SIZE, EPOCHS, ERROR_CLR, INFO_CLR, LEARNING_RATE,
                    SUCCESS_CLR, ModelType, get_bag_avg_and_num_features,
                    get_num_slides, get_vlog)
@@ -125,7 +125,7 @@ class Experiment(ABC):
         
         return fold_result
 
-    def create_experiment_plots(self, return_figures: bool = True) -> list[Figure] | None:
+    def create_experiment_plots(self, return_figures: bool = True) -> dict[str, Figure] | None:
         """
         Create experiment-specific plots.
 
@@ -292,14 +292,23 @@ class Experiment(ABC):
             tiles_per_bag, input_dim = get_bag_avg_and_num_features(bags_path)
             batch_size = config.batch_size if hasattr(config, 'batch_size') else BATCH_SIZE
             
+            """
             # Estimate required memory
-            estimated_memory = estimate_dynamic_vram_usage(
+            estimated_memory = measure_vram_usage(
                 model_cls=model_type.value,
                 batch_size=batch_size,
                 num_classes=2,
                 input_dim=input_dim,
                 tiles_per_bag=tiles_per_bag
             )
+            """
+            estimated_memory = SizeEstimatorHooks(
+                model_cls=model_type.value,
+                input_size=(batch_size, input_dim, 1, 1),
+                batch_size=batch_size,
+                tiles_per_bag=tiles_per_bag,
+                num_classes=2
+            ).estimate_size()[0]
             
             # Train the model
             start_time = time.time()
@@ -511,7 +520,7 @@ class BatchSizeExperiment(Experiment):
         return mil_config(
             model=model_type.value,
             batch_size=batch_size,
-            epochs=EPOCHS,
+            epochs=100,
             lr=LEARNING_RATE,
         )
         
@@ -564,6 +573,39 @@ class BatchSizeExperiment(Experiment):
         
         ax.plot(self.batch_sizes, training_times, marker='o', color='green', label='Total Training Time (s)')
         ax.legend()
+        return fig
+
+    def plot_estimated_vs_actual_memory(self) -> Figure:
+        """Plot estimated vs actual memory usage across all experiments."""
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.set_title("Estimated vs Actual Memory Usage")
+        ax.set_xlabel("Estimated Memory (MB)")
+        ax.set_ylabel("Actual Memory (MB)")
+
+        estimated = [
+            metrics.get('estimated_memory_mb', 0) 
+            for metrics in self.performance_metrics.values()
+            if 'estimated_memory_mb' in metrics
+        ]
+        actual = [
+            metrics.get('avg_memory_usage_mb', 0) 
+            for metrics in self.performance_metrics.values()
+            if 'avg_memory_usage_mb' in metrics
+        ]
+
+        ax.scatter(estimated, actual, alpha=0.7)
+        max_val = max(max(estimated, default=0), max(actual, default=0)) * 1.1
+        ax.plot([0, max_val], [0, max_val], 'r--', label='y=x')
+        ax.legend()
+        
+        # Save figure
+        plot_path = self.results_dir / "estimated_vs_actual_memory.png"
+        fig.savefig(
+            plot_path,
+            bbox_inches='tight',
+            dpi=300
+        )
+        
         return fig
 
 class LearningRateExperiment(Experiment):

@@ -22,7 +22,7 @@ AutoMIL provides a flexible framework for training and evaluating Multiple Insta
 
 ### Setup
 
-#### pip
+#### [pip](https://pypi.org/project/pip/)
 ```bash
 git clone https://github.com/your-repo/AutoMIL.git
 cd AutoMIL
