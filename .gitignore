@@ -9,4 +9,5 @@ data
 __pycache__
 *.txt
 *.log
-PANDAS
+Datasets/*
+batch_size_analysis/*

@@ -19,7 +19,8 @@ from utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, FEATURE_EXTRACTOR,
                    LEARNING_RATE, RESOLUTION_PRESETS, ModelType,
                    batch_conversion_concurrent, batch_generator,
                    calculate_average_mpp, get_bag_avg_and_num_features,
-                   get_num_slides, get_unique_labels, get_vlog)
+                   get_num_slides, get_unique_labels, get_vlog,
+                   pretiled_to_tfrecords)
 
 
 def configure_image_backend(verbose: bool = True):
@@ -165,7 +166,8 @@ def setup_project(
         slide_dir:       Path,
         project_dir:     Path,
         annotation_file: Path,
-        verbose:         bool = True
+        verbose:         bool = True,
+        skip_tiling:     bool = False
     ) -> sf.Project:
     """
     Sets up the project structure in *project_dir* or loads it into a Project Instance, if it already exists
@@ -204,6 +206,7 @@ def setup_dataset(
         label_map: dict | list[str],
         slide_dir: Optional[Path] = None,
         verbose:         bool = True,
+        skip_tiling:     bool = False,
         tiff_conversion: bool = False
     ) -> sf.Dataset:
     """Sets up a comprehensive dataset source for a given resolution preset (tile size and magnification specified) by extracting tiles and generating feature bags
@@ -212,6 +215,9 @@ def setup_dataset(
         project (sf.Project): Project instance from which to build dataset source
         preset (RESOLUTION_PRESETS): Resolution preset containing tile size and magnification
         verbose (bool, optional): Whether to log info messages. Defaults to True.
+        slide_dir (Optional[Path], optional): Directory containing slides. If None, the slides from the project instance will be used. Defaults to None.
+        skip_tiling (bool, optional): Whether to skip the tiling step (assumes tiles are already extracted). Defaults to False.
+        tiff_conversion (bool, optional): Whether to convert slides to .tiff before tiling. Defaults to False.
     """
     global COMMON_MPP_VALUES
     # the .value of a preset is a tuple of tile size (int) and a magnification (str)
@@ -248,14 +254,22 @@ def setup_dataset(
     project_path = Path(project.root)
     bags_path    = project_path / "bags"
 
-    # tiles will be stored in project/tfrecords/{tile_size}px{magnification}x/...
-    if verbose:
-        log.info(f"Extracting tiles at {magnification} | Tile size: {tile_size}")
-    extract_tiles(
-        dataset,
-        tiff_conversion=tiff_conversion,
-        clear_buffer=True
-    )
+    if not skip_tiling:
+        # tiles will be stored in project/tfrecords/{tile_size}px{magnification}x/...
+        if verbose:
+            log.info(f"Extracting tiles at {magnification} | Tile size: {tile_size}")
+        extract_tiles(
+            dataset,
+            tiff_conversion=tiff_conversion,
+            clear_buffer=True
+        )
+    else:
+        if slide_dir is None:
+            raise ValueError("slide_dir cannot be None when calling pretiled_to_tfrecords.")
+        pretiled_to_tfrecords(
+            slide_dir,
+            Path(dataset.tfrecords_folders()[0]),
+        )
 
     # bags will be stored in project/bags/...
     if verbose:
@@ -292,14 +306,14 @@ def extract_tiles(
     # Exception: tiff conversion required, slides are in unsuitable format (e.g .png)
     else:
         slide_list = [Path(slide) for slide in dataset.slide_paths()]
-        tfrecords_path = Path(dataset.tfrecords_folders()[0])  # Should be project_dir / tfrecords / {tile_size}px{magnification}x
+        tfrecords_path = Path(dataset.tfrecords_folders()[0])  # Should be project_dir / tfrecords / {tile_size}px_{tile_size}um
         batch_size = 10
 
         for batch_idx, batch in enumerate(batch_generator(slide_list, batch_size=batch_size)):
             # Multithreaded .png -> .tiff conversion
             batch_conversion_concurrent(
                 batch,
-                Path(dataset.tfrecords_folders()[0]) # Should be project_dir / tfrecords / {tile_size}px{magnification}x
+                Path(dataset.tfrecords_folders()[0]) # Should be project_dir / tfrecords / {tile_size}px{tile_size}um
             )
 
             # Tile extraction for batch

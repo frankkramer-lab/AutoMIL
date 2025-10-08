@@ -20,10 +20,10 @@ from fastai.learner import Learner
 from matplotlib.figure import Figure
 from slideflow.mil import mil_config, train_mil
 
-from estimator import SizeEstimatorHooks, measure_vram_usage
+from estimator import UnifiedSizeEstimator
 from utils import (BATCH_SIZE, EPOCHS, ERROR_CLR, INFO_CLR, LEARNING_RATE,
-                   SUCCESS_CLR, ModelType, get_bag_avg_and_num_features,
-                   get_num_slides, get_vlog)
+                   SUCCESS_CLR, Attention_MIL, ModelType,
+                   get_bag_avg_and_num_features, get_num_slides, get_vlog)
 
 
 class Experiment(ABC):
@@ -205,6 +205,7 @@ class Experiment(ABC):
         parameter_grid = self.get_parameter_grid()
 
         vlog(f"Starting {self.experiment_name} with [{INFO_CLR}]{len(parameter_grid)}[/] parameter combinations")
+        torch.cuda.empty_cache()
 
         for index, params in enumerate(parameter_grid):
             param_key = self._get_parameter_key(params)
@@ -284,6 +285,8 @@ class Experiment(ABC):
             vlog(f"Training fold [{INFO_CLR}]{fold_idx + 1}/{k_folds}[/] with {param_key}")
             
             # Clear CUDA cache before each fold
+            # We dont want memory allocation from previous folds
+            # or the feature extraction process to interfere with out measurements
             self._clear_gpu_memory()
             
             # Get dataset characteristics
@@ -292,27 +295,17 @@ class Experiment(ABC):
             tiles_per_bag, input_dim = get_bag_avg_and_num_features(bags_path)
             batch_size = config.batch_size if hasattr(config, 'batch_size') else BATCH_SIZE
             
-            """
-            # Estimate required memory
-            estimated_memory = measure_vram_usage(
-                model_cls=model_type.value,
-                batch_size=batch_size,
-                num_classes=2,
-                input_dim=input_dim,
-                tiles_per_bag=tiles_per_bag
-            )
-            """
-            estimated_memory = SizeEstimatorHooks(
-                model_cls=model_type.value,
-                input_size=(batch_size, input_dim, 1, 1),
-                batch_size=batch_size,
-                tiles_per_bag=tiles_per_bag,
-                num_classes=2
-            ).estimate_size()[0]
+            # Estimate memory usage
+            estimated_memory, _ = UnifiedSizeEstimator(
+                model=Attention_MIL(n_feats=input_dim, n_out=2),
+                input_size=(batch_size, tiles_per_bag, input_dim),
+                bits=32
+            ).estimate_size(include_memory_overhead=True)
+
+            vlog(f"Actual memory before training: [{INFO_CLR}]{torch.cuda.memory_allocated() / (1024 ** 2):.2f} MB[/]")
             
             # Train the model
             start_time = time.time()
-            
             learner = self._train_model(
                 config=config,
                 train_data=train_data,
@@ -325,7 +318,7 @@ class Experiment(ABC):
             fold_training_time = time.time() - start_time
             total_training_time += fold_training_time
             
-            # Get memory usage
+            # Get (actual) memory usage
             actual_memory = torch.cuda.max_memory_allocated() / (1024 ** 2)
             
             # Extract fold-specific metrics
@@ -520,7 +513,7 @@ class BatchSizeExperiment(Experiment):
         return mil_config(
             model=model_type.value,
             batch_size=batch_size,
-            epochs=100,
+            epochs=EPOCHS,
             lr=LEARNING_RATE,
         )
         
@@ -575,7 +568,7 @@ class BatchSizeExperiment(Experiment):
         ax.legend()
         return fig
 
-    def plot_estimated_vs_actual_memory(self) -> Figure:
+    def _plot_estimated_vs_actual_memory(self) -> Figure:
         """Plot estimated vs actual memory usage across all experiments."""
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.set_title("Estimated vs Actual Memory Usage")
@@ -661,10 +654,10 @@ class LearningRateExperiment(Experiment):
         ax.set_ylabel("Performance Metric")
 
         # Plotting each performance metric
-        for metric, values in self.performance_metrics.items():
-            if not isinstance(values, list):
+        for metric_name, metric_values in self.performance_metrics.items():
+            if not isinstance(metric_values, list):
                 continue
-            ax.plot(self.learning_rates, values, label=metric)
+            ax.plot(self.learning_rates, metric_values, label=metric_name)
 
         ax.legend()
         return fig

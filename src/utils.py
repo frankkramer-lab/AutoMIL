@@ -1,3 +1,4 @@
+import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum
 from pathlib import Path
@@ -101,18 +102,7 @@ def get_vlog(verbose: bool) -> Callable:
             slideflow_log.info(message)
     return _vlog
 
-def get_gpu_memory() -> dict:
-    """Return the free and total GPU memory information.
-
-    Returns:
-        Dictionary with free memory (free_MB), total memory (total_MB) and used memory (used_MB).
-    """
-    free_mem, total_mem = torch.cuda.mem_get_info()
-    return {
-        'free_MB': free_mem // (1024**2),
-        'total_MB': total_mem // (1024**2),
-        'used_MB': (total_mem - free_mem) // (1024**2)
-    }
+# --- Slide / Dataset Info ---
 
 def get_num_slides(dataset: sf.Dataset) -> int:
     """Return the number of slides in a given dataset source.
@@ -197,6 +187,7 @@ def calculate_average_mpp(slide_dir: Path, return_rounded: bool = True) -> Optio
     for slide_path in slide_dir.iterdir():
         if (mpp := get_mpp_from_slide(slide_path)):
             mpp_values.append(mpp)
+    if not mpp_values: return None
     average_mpp = sum(mpp_values) / len(mpp_values)
     if return_rounded and average_mpp is not None:
         return round(average_mpp, 2)
@@ -217,38 +208,6 @@ def get_slide_properties(slide_path: str) -> Optional[dict]:
     # Estimation (or opening slide) failed
     except Exception:
         return None
-
-def remove_pip_version_specs(required_packages_file: Path, out_file: Optional[Path] = None) -> None:
-    """Remove version specifiers from a file with pip package requirements.
-
-    Processes a file produced by pip freeze and removes version specifiers,
-    converting "beautifulsoup4==4.13.4" to "beautifulsoup4".
-
-    Args:
-        required_packages_file: Path to file with required packages list
-        out_file: Path to write modified package list to. If not specified, overwrites the input file.
-
-    Raises:
-        ValueError: If required_packages_file is not a valid file.
-
-    Example:
-        >>> remove_pip_version_specs(Path("requirements.txt"))
-        # Converts: beautifulsoup4==4.13.4 -> beautifulsoup4
-    """
-    if not required_packages_file.is_file():
-        raise ValueError(f"{required_packages_file} is not a file")
-    
-    with open(required_packages_file, "r") as file_stream:
-        lines = file_stream.readlines()
-
-    version_removed_lines = [
-        line.split("==")[0] if "==" in line else line
-        for line in lines
-    ]
-
-    if not out_file: out_file = required_packages_file
-    with open(out_file, "w") as file_stream:
-        file_stream.write("\n".join(version_removed_lines))
 
 def get_bag_avg_and_num_features(bags_dir: Path) -> tuple[int, int]:
     """Compute the average number of tiles per bag and the number of features per tile.
@@ -419,3 +378,97 @@ def batch_conversion_concurrent(file_list: list[Path], out_folder: Path, verbose
                 out_list.append(result)
 
     return out_list
+
+# --- GPU Memory Info ---
+
+def get_free_memory() -> float:
+    """Return the amount of free memory on the current GPU in MB."""
+    free_mem, _ = torch.cuda.mem_get_info()
+    return free_mem / (1024 ** 2)  # Convert to MB
+
+def get_cuda_gpu_memory_used() -> int:
+    """Retrieves the total memory the cuda driver has reserved using nvidia-smi.
+
+    Returns:
+        int: Memory in MB
+    """
+    result = subprocess.check_output(
+        ['nvidia-smi', '--query-gpu=memory.used', '--format=csv,nounits,noheader']
+    )
+    return int(result.decode().strip().split('\n')[0])  # memory in MB of GPU 0
+
+def reserve_tensor_memory() -> float:
+    """Gets the amount of memory overhead reserved when allocating a minimal tensor (small as possible).
+
+    Returns:
+        float: Memory overhead for tensor allocation in MB
+    """
+    if not torch.cuda.is_available():
+        return 0.0
+    torch.cuda.empty_cache()
+
+    # We can get the memory overhead by measuring
+    # the total memory reserved before and after allocating a minimal tensor
+    before = get_cuda_gpu_memory_used()
+    a = torch.FloatTensor(1).cuda()
+    torch.cuda.synchronize() # Ensure the allocation is complete
+    after = get_cuda_gpu_memory_used()
+    return after - before
+
+# --- Miscalleneous ---
+
+def remove_pip_version_specs(required_packages_file: Path, out_file: Optional[Path] = None) -> None:
+    """Remove version specifiers from a file with pip package requirements.
+
+    Processes a file produced by pip freeze and removes version specifiers,
+    converting "beautifulsoup4==4.13.4" to "beautifulsoup4".
+
+    Args:
+        required_packages_file: Path to file with required packages list
+        out_file: Path to write modified package list to. If not specified, overwrites the input file.
+
+    Raises:
+        ValueError: If required_packages_file is not a valid file.
+
+    Example:
+        >>> remove_pip_version_specs(Path("requirements.txt"))
+        # Converts: beautifulsoup4==4.13.4 -> beautifulsoup4
+    """
+    if not required_packages_file.is_file():
+        raise ValueError(f"{required_packages_file} is not a file")
+    
+    with open(required_packages_file, "r") as file_stream:
+        lines = file_stream.readlines()
+
+    version_removed_lines = [
+        line.split("==")[0] if "==" in line else line
+        for line in lines
+    ]
+
+    if not out_file: out_file = required_packages_file
+    with open(out_file, "w") as file_stream:
+        file_stream.write("\n".join(version_removed_lines))
+
+def pretiled_to_tfrecords(
+    pretiled_root: Path,
+    outdir: Path,
+) -> None:
+    """
+    Convert loose tile images (.tif) organized by slide subfolders into TFRecords.
+
+    Args:
+        pretiled_root: Directory containing subfolders for each slide, each with .tif tiles.
+        outdir: Where to write the TFRecords.
+        tile_size: Tile dimension (px) — for informational consistency.
+        magnification: Magnification identifier (e.g. "10x", "20x") — for metadata.
+        annotation_file: CSV of slide annotations (slide IDs, labels).
+        verbose: Whether to print status logs.
+    """
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    # Use write_tfrecords_multi to process multiple slide subdirectories
+    # Each subdirectory name is taken as a slide name
+    sf.io.write_tfrecords_multi(
+        str(pretiled_root),
+        str(outdir)
+    )

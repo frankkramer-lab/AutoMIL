@@ -32,6 +32,7 @@ def AutoMIL():
 @click.option("-sc", "--slide_column",   type=str, default=None,      help="Name of the column containing slide names")
 @click.option("-k",                      type=int, default=3,         help="number of folds to train per resolution level")
 @click.option("-t", "--transform_labels", is_flag=True,                 help="Transforms labels to float values (0.0, 1.0, ...)")
+@click.option("-s", "--skip_tiling",      is_flag=True,                 help="Skips the tiling step (assumes tiles are already extracted)")
 @click.option("-v", "--verbose",          is_flag=True,                 help="Enables additional logging messages")
 @click.option("-c", "--cleanup",          is_flag=True,                 help="Deletes the created project structure")
 def run_pipeline(
@@ -43,11 +44,11 @@ def run_pipeline(
     slide_column:    str,
     k:               int,
     transform_labels: bool,
+    skip_tiling:      bool,
     verbose:          bool,
     cleanup:          bool
     ):
     """Executes the full AutoMIL pipeline
-    
     
     1. Image backend configuration
     2. Project setup
@@ -90,6 +91,7 @@ def run_pipeline(
         Path(slide_dir),
         verbose=verbose,
         tiff_conversion=tiff_conversion,
+        skip_tiling=skip_tiling
     )
 
     # --- 4. Run Training ---
@@ -111,6 +113,7 @@ def run_pipeline(
 @click.option("-bs", "--batch_sizes",     type=str, default="2,4,8,16,32", help="Comma-separated list of batch sizes to test")
 @click.option("-k",                       type=int, default=3,             help="Number of folds to train per batch size")
 @click.option("-t", "--transform_labels", is_flag=True,                   help="Transforms labels to float values (0.0, 1.0, ...)")
+@click.option("-s", "--skip_tiling",      is_flag=True,                   help="Skips the tiling step (assumes tiles are already extracted)")
 @click.option("-v", "--verbose",          is_flag=True,                   help="Enables additional logging messages")
 def batch_analysis(
     slide_dir:       str,
@@ -122,6 +125,7 @@ def batch_analysis(
     batch_sizes:     str,
     k:               int,
     transform_labels: bool,
+    skip_tiling:      bool,
     verbose:          bool
     ):
     """Runs a batch size analysis
@@ -163,6 +167,7 @@ def batch_analysis(
         Path(slide_dir),
         verbose=verbose,
         tiff_conversion=False,
+        skip_tiling=skip_tiling
     )
 
     # --- 4. Run Batch Size Analysis ---
