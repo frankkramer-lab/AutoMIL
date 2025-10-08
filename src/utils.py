@@ -97,9 +97,11 @@ def get_vlog(verbose: bool) -> Callable:
     Returns:
         Logging function that conditionally logs messages.
     """
-    def _vlog(message: str) -> None:
+    def _vlog(message: str, error: bool = False) -> None:
         if verbose:
             slideflow_log.info(message)
+            if error:
+                slideflow_log.error(message)
     return _vlog
 
 # --- Slide / Dataset Info ---

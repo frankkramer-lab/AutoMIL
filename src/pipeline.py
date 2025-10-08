@@ -15,8 +15,9 @@ from slideflow.slide import qc
 from slideflow.util import is_project, log
 
 from estimator import adjust_batch_size, estimate_dynamic_vram_usage
-from utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, FEATURE_EXTRACTOR,
-                   LEARNING_RATE, RESOLUTION_PRESETS, ModelType,
+from utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, ERROR_CLR,
+                   FEATURE_EXTRACTOR, HIGHLIGHT_CLR, INFO_CLR, LEARNING_RATE,
+                   RESOLUTION_PRESETS, SUCCESS_CLR, ModelType,
                    batch_conversion_concurrent, batch_generator,
                    calculate_average_mpp, get_bag_avg_and_num_features,
                    get_num_slides, get_unique_labels, get_vlog,
@@ -35,18 +36,17 @@ def configure_image_backend(verbose: bool = True):
     Args:
         verbose (bool, optional): Whether to log info messages. Defaults to True.
     """
+    vlog = get_vlog(verbose)
     system = platform.system().lower()
+
     if system == "windows":
-        if verbose:
-            log.info("Using [cyan]libvips[/] backend on Windows")
+        vlog(f"Using [{INFO_CLR}]libvips[/] backend on Windows")
         os.environ["SF_SLIDE_BACKEND"] = "libvips"
     elif system == "linux":
-        if verbose:
-            log.info("Using [cyan]cucim[/] backend on Linux")
+        vlog(f"Using [{INFO_CLR}]cucim[/] backend on Linux")
         os.environ["SF_SLIDE_BACKEND"] = "cucim"
     else:
-        if verbose:
-            log.error(f"Unsupported OS: [red]{system}[/]")
+        vlog(f"Unsupported OS: [{ERROR_CLR}]{system}[/]", error=True)
         sys.exit(1)
 
 def setup_annotations(
@@ -72,6 +72,7 @@ def setup_annotations(
         project_dir (Path): Directory in which the project structure will be created (modified annotations will be stored here)
         slide_column (Optional[str], optional): Name of the column containing slide identifiers (Will be renamed to 'slide'). Defaults to None.
         transform_labels (bool, optional): Whether to transform labels to float values. Defaults to True.
+        verbose (bool, optional): Whether to log info messages. Defaults to True.
 
     Raises:
         Exception: If unable to create the modified annotation file
@@ -108,9 +109,9 @@ def setup_annotations(
     annotations.to_csv(annotation_file, index=True)
     # Error handling
     if not annotation_file.exists():
-        raise Exception(f"Annotation file [bold]{annotation_file}[/] could not be created.")
+        raise Exception(f"Annotation file [{INFO_CLR}]{annotation_file}[/] could not be created.")
     if not annotations.empty:
-        log.info(f"Annotations saved to [bold]{annotation_file}[/]")
+        vlog(f"Annotations saved to [{INFO_CLR}]{annotation_file}[/]")
 
     return annotation_file, label_map
 
@@ -141,13 +142,13 @@ def create_project_scaffold(
     # Simple project directory creation
     if not project_dir.exists():
         project_dir.mkdir(parents=True, exist_ok=True)
-        vlog(f"Created project directory at [bold]{project_dir}[/]")
+        vlog(f"Created project directory at [{INFO_CLR}]{project_dir}[/]")
     else:
-        vlog(f"Project directory [bold]{project_dir}[/] already exists")
+        vlog(f"Project directory [{INFO_CLR}]{project_dir}[/] already exists")
     
     # Annotations file setup
     if (annotations := project_dir / "annotations.csv") in project_dir.iterdir():
-        vlog(f"Annotations file [bold]{annotations}[/] already exists")
+        vlog(f"Annotations file [{INFO_CLR}]{annotations}[/] already exists")
         return annotations, get_unique_labels(annotations, label_column)
     else:
         modified_annotations, label_map = setup_annotations(
@@ -158,8 +159,7 @@ def create_project_scaffold(
             slide_column,
             transform_labels
         )
-        if verbose:
-            log.info(f"Modified annotations saved to [bold]{modified_annotations}[/]")
+        vlog(f"Modified annotations saved to [{INFO_CLR}]{modified_annotations}[/]")
         return modified_annotations, label_map
 
 def setup_project(
@@ -167,7 +167,6 @@ def setup_project(
         project_dir:     Path,
         annotation_file: Path,
         verbose:         bool = True,
-        skip_tiling:     bool = False
     ) -> sf.Project:
     """
     Sets up the project structure in *project_dir* or loads it into a Project Instance, if it already exists
@@ -181,16 +180,15 @@ def setup_project(
     Returns:
         Project: Created or loaded project instance
     """
+    vlog = get_vlog(verbose)
     # Many slideflow methods only accept paths in the form of strings
     project_dir_str = str(project_dir)
 
     if is_project(project_dir_str):
-        if verbose:
-            log.info(f"[bold]{project_dir}[/] is already a project. Loaded")
+        vlog(f"[{INFO_CLR}]{project_dir}[/] is already a project. Loaded")
         return sf.load_project(project_dir_str)
 
-    if verbose:
-        log.info(f"Creating project at [bold]{project_dir}[/]")
+    vlog(f"Creating project at [{INFO_CLR}]{project_dir}[/]")
     project = sf.create_project(
         name="AutoMIL",
         root=project_dir_str,
@@ -219,6 +217,7 @@ def setup_dataset(
         skip_tiling (bool, optional): Whether to skip the tiling step (assumes tiles are already extracted). Defaults to False.
         tiff_conversion (bool, optional): Whether to convert slides to .tiff before tiling. Defaults to False.
     """
+    vlog = get_vlog(verbose)
     global COMMON_MPP_VALUES
     # the .value of a preset is a tuple of tile size (int) and a magnification (str)
     tile_size, magnification = preset.value
@@ -244,7 +243,7 @@ def setup_dataset(
             unique_labels = None
 
     filters = {"label": unique_labels} if unique_labels else None
-    log.info(filters)
+    vlog(filters)
     dataset = project.dataset(
         tile_size,
         tile_um,
@@ -254,21 +253,21 @@ def setup_dataset(
     project_path = Path(project.root)
     bags_path    = project_path / "bags"
 
-    if not skip_tiling:
-        # tiles will be stored in project/tfrecords/{tile_size}px{magnification}x/...
-        if verbose:
-            log.info(f"Extracting tiles at {magnification} | Tile size: {tile_size}")
+    # If tiling is skipped, we assume the slides are already pre-tiled and stored in slide_dir
+    if skip_tiling:
+        if slide_dir is None:
+            raise Exception("Cannot extract tfrecords from pretiled dataset: No slide directory was provided.")
+        # the feature extractor extpects tfrecords
+        pretiled_to_tfrecords(
+            slide_dir,
+            Path(dataset.tfrecords_folders()[0]),
+        )
+    else:
+        vlog(f"Extracting tiles at {magnification} | Tile size: {tile_size}")
         extract_tiles(
             dataset,
             tiff_conversion=tiff_conversion,
             clear_buffer=True
-        )
-    else:
-        if slide_dir is None:
-            raise ValueError("slide_dir cannot be None when calling pretiled_to_tfrecords.")
-        pretiled_to_tfrecords(
-            slide_dir,
-            Path(dataset.tfrecords_folders()[0]),
         )
 
     # bags will be stored in project/bags/...
