@@ -1,3 +1,4 @@
+import traceback
 import warnings
 
 # Suppressing warnings related to pkg_ressources and timm
@@ -105,6 +106,8 @@ def run_pipeline(
         )
     
     except Exception as e:
+        tb = traceback.format_exc()
+        vlog(tb, error=True)
         vlog(f"[{ERROR_CLR}]Error:[/] {e}", error=True)
         return
 
@@ -194,6 +197,8 @@ def batch_analysis(
         experiment.create_experiment_plots(return_figures=False)
     
     except Exception as e:
+        tb = traceback.format_exc()
+        vlog(tb, error=True)
         vlog(f"[{ERROR_CLR}]Error:[/] {e}", error=True)
         return
 

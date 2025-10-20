@@ -72,3 +72,48 @@ python3 src/cli.py batch-analysis ./slides ./annotations.csv ./project_dir --bat
 - All options from `run-pipeline`
 - `-bs, --batch_sizes`: Comma-separated batch sizes (default: "2,4,8,16,32")
 - `-p, --plot`: Generate plots automatically after analysis
+
+## Expected Dataset Structure
+
+AutoMIL expects datasets to be organized in a specific structure depending on the type of dataset being used (WSI dataset or pretiled image dataset).
+
+### Whole Slide Image Dataset (Default)
+
+When working with WSI's, provide the following paths to the `run-pipeline` or `batch-analysis` commands:
+
+- **Slides Directory:** A directory containing all WSI files (e.g., `.svs`, `.tiff`, etc.) | CLI Argument: **SLIDES_DIR** \
+**NOTE**: If slides come in the .png format, a preprocessing step is performed to convert them to .tiff files for compatibility.
+
+- **Annotations File:** a .csv containing associated patient and slide IDs along with their labels | CLI Argument: **ANNOTATIONS_FILE** \
+    At minimum, the .csv file should contain the following columns:
+    - Patient ID column (default name: "patient", configurable via `-pc, --patient_column`)
+    - Label column (default name: "label", configurable via `-lc, --label_column`)
+    A minimal annotations file could look like this:
+    ```
+    patient,label
+    P001,0
+    P002,1
+    P003,0
+    P004,1
+    ```
+
+- **Project Directory:** A directory where any intermediate files and results will be stored | CLI Argument: **PROJECT_DIR** \
+The project directory will be created if it does not already exist.
+
+### Pretiled Image Dataset
+
+If you are working with a pretiled dataset, make sure that your **Slide Directory** is structured as follows:
+
+- Each slide should have its own subdirectory within the main slides directory.
+- Each subdirectory should contain the image tiles corresponding to that slide.
+For example:
+```
+slides/
+    slide_001/
+        tile_001.png
+        tile_002.png
+        ...
+    slide_002/
+        tile_001.png
+        tile_002.png
+```

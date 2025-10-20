@@ -16,7 +16,7 @@ from slideflow.util import is_project, log
 
 from estimator import adjust_batch_size, estimate_dynamic_vram_usage
 from utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, ERROR_CLR,
-                   FEATURE_EXTRACTOR, HIGHLIGHT_CLR, INFO_CLR, LEARNING_RATE,
+                   FEATURE_EXTRACTOR, INFO_CLR, LEARNING_RATE,
                    RESOLUTION_PRESETS, SUCCESS_CLR, ModelType,
                    batch_conversion_concurrent, batch_generator,
                    calculate_average_mpp, get_bag_avg_and_num_features,
@@ -242,14 +242,13 @@ def setup_dataset(
         case _:
             unique_labels = None
 
-    filters = {"label": unique_labels} if unique_labels else None
-    vlog(filters)
-    dataset = project.dataset(
-        tile_size,
-        tile_um,
-        # slideflow needs this to recognize these values as classes
-        filters= {"label": unique_labels} if unique_labels else None,
-    )
+    # Create dataset (without filters initially for pre-tiled data)
+    if skip_tiling:
+        dataset = project.dataset(tile_size, tile_um)
+    else:
+        filters = {"label": unique_labels} if unique_labels else None
+        dataset = project.dataset(tile_size, tile_um, filters=filters)
+
     project_path = Path(project.root)
     bags_path    = project_path / "bags"
 
@@ -257,30 +256,70 @@ def setup_dataset(
     if skip_tiling:
         if slide_dir is None:
             raise Exception("Cannot extract tfrecords from pretiled dataset: No slide directory was provided.")
-        # the feature extractor extpects tfrecords
+        
+        # Get annotations before creating tfrecords
+        annotations_file = project.annotations
+        if annotations_file is None:
+            raise Exception("Cannot extract tfrecords from pretiled dataset: No annotations file found in project.")
+        
+        # Ensure tfrecords directory exists
+        tfrecords_dir = Path(dataset.tfrecords_folders()[0])
+        tfrecords_dir.mkdir(parents=True, exist_ok=True)
+        
+        vlog(f"Converting pre-tiled slides to tfrecords at [{INFO_CLR}]{tfrecords_dir}[/]")
+        # the feature extractor expects tfrecords
         pretiled_to_tfrecords(
             slide_dir,
-            Path(dataset.tfrecords_folders()[0]),
+            tfrecords_dir,
         )
+        
+        # Apply filters after rebuilding index
+        if unique_labels:
+            dataset = project.dataset(
+                tile_size, 
+                tile_um, 
+                filters={"label": unique_labels}
+            )
+        
+        dataset.rebuild_index()
+        dataset.update_manifest(force_update=True)
+        
+        # Verify the manifest is populated
+        manifest = dataset.manifest()
+        vlog(f"Dataset manifest contains {len(manifest)} entries")
+        
+        if len(manifest) == 0:
+            raise Exception("No slides found in the pre-tiled dataset after converting to tfrecords.")
+            
+        vlog(f"Successfully created dataset with [{INFO_CLR}]{len(manifest)}[/] slides from pre-tiled data")
+        
     else:
-        vlog(f"Extracting tiles at {magnification} | Tile size: {tile_size}")
-        extract_tiles(
+        vlog(f"Extracting tiles at [{INFO_CLR}]{magnification}[/] | Tile size: [{INFO_CLR}]{tile_size}[/]")
+        success = extract_tiles(
             dataset,
             tiff_conversion=tiff_conversion,
             clear_buffer=True
         )
+        if not success:
+            raise Exception("Tile extraction failed.")
+        vlog(f"[{SUCCESS_CLR}]Finished extracting tiles[/]\n")
 
     # bags will be stored in project/bags/...
-    if verbose:
-        log.info("Generating feature bags...")
     extractor = sf.build_feature_extractor(
         name=FEATURE_EXTRACTOR,
         resize=224
     )
+    vlog("Starting Feature Extraction...")
+    num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+    vlog(f"Using [{INFO_CLR}]{num_gpus}[/] GPUs for feature extraction")
+
     dataset.generate_feature_bags(
         model=extractor,
-        outdir=str(bags_path)
+        outdir=str(bags_path),
+        slide_batch_size=32,
+        num_gpus=num_gpus
     )
+    vlog(f"[{SUCCESS_CLR}]Finished Feature Extraction[/]\n")
 
     return dataset
 
@@ -447,7 +486,6 @@ def train_with_estimate_comparison(
 
     # Get average number of tiles per bag and number of features per tile
     tiles_per_bag, input_dim = get_bag_avg_and_num_features(bags_path)
-    vlog(dataset.slide_paths())
     adjusted_batch_size = adjust_batch_size(
         model_cls,
         BATCH_SIZE,
@@ -486,7 +524,7 @@ def train_with_estimate_comparison(
 
     for i, (train, val) in enumerate(folds):
         vlog(f"Training fold {i+1}/5")
-
+        vlog(f"{train.slides()}")
         # Clear cuda cache befor training
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()

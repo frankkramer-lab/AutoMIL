@@ -4,15 +4,21 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Generator, Optional, TypeVar
 
+import cv2
+import numpy as np
 import openslide
 import pandas as pd
 import pyvips
 import slideflow as sf
 import torch
+from PIL import Image
+from slideflow.io import TFRecordWriter, write_tfrecords_multi
+from slideflow.io.torch import serialized_record
 from slideflow.mil.models import Attention_MIL, TransMIL
 from slideflow.mil.models.bistro.transformer import \
     Attention as BistroTransformer
 from slideflow.util import log as slideflow_log
+from slideflow.util.tfrecord2idx import create_index
 
 """
 Variables and utility methods used throughout the project.
@@ -115,7 +121,7 @@ def get_num_slides(dataset: sf.Dataset) -> int:
     Returns:
         Number of slides in the dataset.
     """
-    return len(dataset.slide_paths())
+    return len(dataset.slides())
 
 def get_slide_magnification(slide_path: str | Path) -> Optional[str]:
     """Retrieve magnification from slide properties or estimate using microns per pixel.
@@ -451,26 +457,124 @@ def remove_pip_version_specs(required_packages_file: Path, out_file: Optional[Pa
     with open(out_file, "w") as file_stream:
         file_stream.write("\n".join(version_removed_lines))
 
+# --- TFRecords Conversion ---
+
 def pretiled_to_tfrecords(
     pretiled_root: Path,
     outdir: Path,
-) -> None:
+    overwrite: bool = False,
+    verbose: bool = True
+):
     """
-    Convert loose tile images (.tif) organized by slide subfolders into TFRecords.
+    Convert loose .tif/.tiff tiles organized by slide subfolders into TFRecords,
+    assigning sequential indices compatible with Slideflow.
+
+    Expected structure:
+        pretiled_root/
+            slideA/
+                tile_00001.tif
+                tile_00002.tif
+                ...
+            slideB/
+                tile_00001.tif
+                ...
+    or:
+        pretiled_root/
+            slideA/
+                tile_00001.tiff
+                tile_00002.tiff
+                ...
+            slideB/
+                tile_00001.tiff
+                ...
 
     Args:
-        pretiled_root: Directory containing subfolders for each slide, each with .tif tiles.
-        outdir: Where to write the TFRecords.
-        tile_size: Tile dimension (px) — for informational consistency.
-        magnification: Magnification identifier (e.g. "10x", "20x") — for metadata.
-        annotation_file: CSV of slide annotations (slide IDs, labels).
-        verbose: Whether to print status logs.
+        pretiled_root: Root folder with one subfolder per slide.
+        outdir: Destination directory for .tfrecord files.
+        overwrite: Whether to overwrite existing TFRecord files.
+        verbose: Whether to print progress information.
     """
+    vlog = get_vlog(verbose)
     outdir.mkdir(parents=True, exist_ok=True)
 
+    slide_dirs = sorted([entry for entry in pretiled_root.iterdir() if entry.is_dir()])
+    if not slide_dirs:
+        raise ValueError(f"No slide subdirectories found in {pretiled_root}")
+
+    for slide_dir in slide_dirs:
+        slide_id = slide_dir.name
+        tfrecord_path = outdir / f"{slide_id}.tfrecords"
+        if tfrecord_path.exists() and not overwrite:
+            vlog(f"{tfrecord_path} already exists. Skipping.")
+            continue
+            
+        tile_paths = sorted(list(slide_dir.glob("*.tif")) + list(slide_dir.glob("*.tiff")))
+        if not tile_paths:
+            vlog(f"No .tif/.tiff files found in {slide_dir}, skipping.")
+            continue
+
+        writer = TFRecordWriter(str(tfrecord_path))
+        vlog(f"Writing {len(tile_paths)} tiles for {slide_id}")
+
+        for idx, tile_path in enumerate(tile_paths):
+            # Aritrary grid location
+            grid_width = len(tile_paths) if len(tile_paths) < 32 else 32
+            loc_x = int(idx % grid_width)
+            loc_y = int(idx // grid_width)
+
+            # Convert tile to bytes
+            label = bytes(slide_id, 'utf-8')
+            img = np.array(Image.open(tile_path).convert("RGB"))
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            image_string = cv2.imencode(".png", img)[1].tobytes()
+
+            # Serializze and write record
+            record = serialized_record(label, image_string, loc_x=loc_x, loc_y=loc_y)
+            writer.write(record)
+
+        writer.close()
+
+        # Create index file for the TFRecords
+        create_index(str(tfrecord_path))
+
+def pretiled_to_tfrecords_multi(
+    pretiled_root: Path,
+    outdir: Path,
+    verbose: bool = True
+):
+    """
+    Convert loose .tif/.tiff tiles organized by slide subfolders into TFRecords
+
+    Expected structure:
+        pretiled_root/
+            slideA/
+                tile_00001.tif
+                tile_00002.tif
+                ...
+            slideB/
+                tile_00001.tif
+                ...
+    or:
+        pretiled_root/
+            slideA/
+                tile_00001.tiff
+                tile_00002.tiff
+                ...
+            slideB/
+                tile_00001.tiff
+                ...
+
+    Args:
+        pretiled_root: Root folder with one subfolder per slide.
+        outdir: Destination directory for .tfrecord files.
+    """
+    vlog = get_vlog(verbose)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    vlog(f"Converting pretiled images in {pretiled_root} to TFRecords in {outdir}")
     # Use write_tfrecords_multi to process multiple slide subdirectories
     # Each subdirectory name is taken as a slide name
-    sf.io.write_tfrecords_multi(
+    write_tfrecords_multi(
         str(pretiled_root),
         str(outdir)
     )
