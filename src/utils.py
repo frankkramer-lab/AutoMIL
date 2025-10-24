@@ -88,6 +88,14 @@ SUCCESS_CLR:    str = "green"      # Success Messages | Completed operations
 ERROR_CLR:      str = "red"        # Error Messages   | Warnings
 HIGHLIGHT_CLR:  str = "yellow"     # Highlighting     | Important information
 
+# --- Logging Flags ---
+
+class LogLevel(Enum):
+    INFO    = 20
+    DEBUG   = 10
+    WARNING = 30
+    ERROR   = 40
+
 # ----------------------- #
 # --- Utility methods --- #
 # ----------------------- #
@@ -103,11 +111,17 @@ def get_vlog(verbose: bool) -> Callable:
     Returns:
         Logging function that conditionally logs messages.
     """
-    def _vlog(message: str, error: bool = False) -> None:
+    def _vlog(message: str, log_level: LogLevel) -> None:
         if verbose:
-            slideflow_log.info(message)
-            if error:
-                slideflow_log.error(message)
+            match log_level:
+                case LogLevel.INFO:
+                    slideflow_log.info(message)
+                case LogLevel.DEBUG:
+                    slideflow_log.debug(message)
+                case LogLevel.WARNING:
+                    slideflow_log.warning(message)
+                case LogLevel.ERROR:
+                    slideflow_log.error(message)
     return _vlog
 
 # --- Slide / Dataset Info ---

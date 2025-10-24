@@ -17,7 +17,7 @@ from slideflow.util import is_project, log
 from estimator import adjust_batch_size, estimate_dynamic_vram_usage
 from utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, ERROR_CLR,
                    FEATURE_EXTRACTOR, INFO_CLR, LEARNING_RATE,
-                   RESOLUTION_PRESETS, SUCCESS_CLR, ModelType,
+                   RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel, ModelType,
                    batch_conversion_concurrent, batch_generator,
                    calculate_average_mpp, get_bag_avg_and_num_features,
                    get_num_slides, get_unique_labels, get_vlog,
@@ -46,7 +46,7 @@ def configure_image_backend(verbose: bool = True):
         vlog(f"Using [{INFO_CLR}]cucim[/] backend on Linux")
         os.environ["SF_SLIDE_BACKEND"] = "cucim"
     else:
-        vlog(f"Unsupported OS: [{ERROR_CLR}]{system}[/]", error=True)
+        vlog(f"Unsupported OS: [{ERROR_CLR}]{system}[/]", LogLevel.ERROR)
         sys.exit(1)
 
 def setup_annotations(
@@ -102,7 +102,7 @@ def setup_annotations(
         annotations["label"] = annotations["label"].map(label_map)
         vlog(f"Transformed labels to float values: {', '.join([f'{k}: {v}' for k, v in label_map.items()])}")
     else:
-        label_map = [label for label in annotations["label"].dropna().unique()]
+        label_map = annotations["label"].dropna().unique().tolist()
     
     # Save the modified annotations to the project directory
     annotation_file = project_dir / "annotations.csv"
@@ -240,14 +240,30 @@ def setup_dataset(
             unique_labels = label_map
         # None or empty list (should not happen but is here for completeness)
         case _:
-            unique_labels = None
+            unique_labels = []
 
-    # Create dataset (without filters initially for pre-tiled data)
-    if skip_tiling:
-        dataset = project.dataset(tile_size, tile_um)
-    else:
-        filters = {"label": unique_labels} if unique_labels else None
-        dataset = project.dataset(tile_size, tile_um, filters=filters)
+    # Create dataset and load annotations
+    dataset = project.dataset(tile_size, tile_um)
+    annotations = dataset.annotations if dataset.annotations is not None else pd.DataFrame()
+
+    # Filter dataset to only include slides with labels in unique_labels
+    if unique_labels:
+        # Check for datatype mismatches between annotations and unique_labels
+        # When creating a dataset source, slideflow seems to cast annotation columns to the 'object' dtype by default
+        # Thus we attempt to cast unique_labels to the same dtype (or type) as annotations['label']
+        label_dtype = type(annotations["label"].iloc[0]) if not annotations.empty else str
+        label_map_type = type(unique_labels[0])
+        if label_dtype != label_map_type:
+            vlog(f"Datatype mismatch between annotations labels ({label_dtype}) and unique_labels ({label_map_type}). Attempting to cast unique_labels.", LogLevel.ERROR)
+            try:
+                unique_labels = [label_dtype(label) for label in unique_labels]
+            except Exception as e:
+                raise Exception(f"Failed to cast unique_labels to {label_dtype}: {e}")
+        dataset = project.dataset(
+            tile_size,
+            tile_um,
+            filters={"label": unique_labels}
+        )
 
     project_path = Path(project.root)
     bags_path    = project_path / "bags"
@@ -256,7 +272,8 @@ def setup_dataset(
     if skip_tiling:
         if slide_dir is None:
             raise Exception("Cannot extract tfrecords from pretiled dataset: No slide directory was provided.")
-        
+        # set slide dir in dataset to the provided slide dir
+
         # Get annotations before creating tfrecords
         annotations_file = project.annotations
         if annotations_file is None:
@@ -272,22 +289,11 @@ def setup_dataset(
             slide_dir,
             tfrecords_dir,
         )
-        
-        # Apply filters after rebuilding index
-        if unique_labels:
-            dataset = project.dataset(
-                tile_size, 
-                tile_um, 
-                filters={"label": unique_labels}
-            )
-        
         dataset.rebuild_index()
         dataset.update_manifest(force_update=True)
-        
+
         # Verify the manifest is populated
         manifest = dataset.manifest()
-        vlog(f"Dataset manifest contains {len(manifest)} entries")
-        
         if len(manifest) == 0:
             raise Exception("No slides found in the pre-tiled dataset after converting to tfrecords.")
             
@@ -523,8 +529,7 @@ def train_with_estimate_comparison(
         folds = [(train, val) for train, val in dataset.kfold_split(k, labels="label")]
 
     for i, (train, val) in enumerate(folds):
-        vlog(f"Training fold {i+1}/5")
-        vlog(f"{train.slides()}")
+        vlog(f"Training fold {i+1}/{k}")
         # Clear cuda cache befor training
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()

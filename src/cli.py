@@ -13,7 +13,7 @@ from Experiments.experiment import BatchSizeExperiment
 from pipeline import (configure_image_backend, create_project_scaffold,
                       run_dataset_setup_loop, setup_dataset, setup_project,
                       train_with_estimate_comparison)
-from utils import ERROR_CLR, RESOLUTION_PRESETS, ModelType, get_vlog
+from utils import ERROR_CLR, RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
@@ -27,10 +27,10 @@ def AutoMIL():
 @click.argument("slide_dir",        type=click.Path(exists=True, file_okay=False))
 @click.argument("annotation_file",  type=click.Path(exists=True, file_okay=True))
 @click.argument("project_dir",      type=click.Path(file_okay=False))
-@click.option("-pc", "--patient_column", type=str, default="patient", help="Name of the column containing patient IDs")
-@click.option("-lc", "--label_column",   type=str, default="label",   help="Name of the column containing labels")
-@click.option("-sc", "--slide_column",   type=str, default=None,      help="Name of the column containing slide names")
-@click.option("-k",                      type=int, default=3,         help="number of folds to train per resolution level")
+@click.option("-pc", "--patient_column", type=str, default="patient",   help="Name of the column containing patient IDs")
+@click.option("-lc", "--label_column",   type=str, default="label",     help="Name of the column containing labels")
+@click.option("-sc", "--slide_column",   type=str, default=None,        help="Name of the column containing slide names")
+@click.option("-k",                      type=int, default=3,           help="number of folds to train per resolution level")
 @click.option("-t", "--transform_labels", is_flag=True,                 help="Transforms labels to float values (0.0, 1.0, ...)")
 @click.option("-s", "--skip_tiling",      is_flag=True,                 help="Skips the tiling step (assumes tiles are already extracted)")
 @click.option("-v", "--verbose",          is_flag=True,                 help="Enables additional logging messages")
@@ -107,8 +107,8 @@ def run_pipeline(
     
     except Exception as e:
         tb = traceback.format_exc()
-        vlog(tb, error=True)
-        vlog(f"[{ERROR_CLR}]Error:[/] {e}", error=True)
+        vlog(tb, LogLevel.ERROR)
+        vlog(f"[{ERROR_CLR}]Error:[/] {e}", LogLevel.ERROR)
         return
 
 @AutoMIL.command(name="batch-analysis", context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
@@ -148,7 +148,7 @@ def batch_analysis(
     try:
         batch_size_list = [int(bs.strip()) for bs in batch_sizes.split(',')]
     except ValueError:
-        vlog(f"[{ERROR_CLR}]Error:[/] Invalid batch sizes. Please provide comma-separated integers.", error=True)
+        vlog(f"[{ERROR_CLR}]Error:[/] Invalid batch sizes. Please provide comma-separated integers.", LogLevel.ERROR)
         return
 
     try:
@@ -198,8 +198,8 @@ def batch_analysis(
     
     except Exception as e:
         tb = traceback.format_exc()
-        vlog(tb, error=True)
-        vlog(f"[{ERROR_CLR}]Error:[/] {e}", error=True)
+        vlog(tb, LogLevel.ERROR)
+        vlog(f"[{ERROR_CLR}]Error:[/] {e}", LogLevel.ERROR)
         return
 
 if __name__ == '__main__':
