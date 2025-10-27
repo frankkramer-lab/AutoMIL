@@ -487,3 +487,23 @@ class UnifiedSizeEstimator:
         total_megabytes = (total / 8) / (1024 ** 2)
 
         return float(total_megabytes), int(total)
+    
+def estimate_model_size(model: type[nn.Module], batch_size: int, bag_size: int, input_dim: int, include_memory_overhead: bool = True) -> float:
+    """Estimates the size of a MIL pytorch module in MB
+
+    Args:
+        model (nn.Module): Pytorch module
+        batch_size (int): Batch size
+        bag_size (int): Bag size (number of tiles in bag)
+        input_dim (int): Input dimensions
+        include_memory_overhead (bool, optional): Whether to include the memory overhead of tensor allocation in the estimate. Defaults to True.
+
+    Returns:
+        float: Estimated memory in MB
+    """
+    estimated_mem_mb, _ = UnifiedSizeEstimator(
+        model=model(n_feats=input_dim, n_out=2),
+        input_size=(batch_size, bag_size, input_dim),
+        bits=32
+    ).estimate_size(include_memory_overhead=False)
+    return estimated_mem_mb

@@ -10,11 +10,11 @@ import pandas as pd
 import slideflow as sf
 import torch
 from slideflow.mil import mil_config, train_mil
-from slideflow.mil.models import TransMIL
+from slideflow.mil.models import Attention_MIL, TransMIL
 from slideflow.slide import qc
 from slideflow.util import is_project, log
 
-from estimator import adjust_batch_size, estimate_dynamic_vram_usage
+from estimator import adjust_batch_size, estimate_model_size
 from utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, ERROR_CLR,
                    FEATURE_EXTRACTOR, INFO_CLR, LEARNING_RATE,
                    RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel, ModelType,
@@ -109,7 +109,7 @@ def setup_annotations(
     annotations.to_csv(annotation_file, index=True)
     # Error handling
     if not annotation_file.exists():
-        raise Exception(f"Annotation file [{INFO_CLR}]{annotation_file}[/] could not be created.")
+        raise Exception(f"Annotation file {annotation_file} could not be created.")
     if not annotations.empty:
         vlog(f"Annotations saved to [{INFO_CLR}]{annotation_file}[/]")
 
@@ -254,7 +254,7 @@ def setup_dataset(
         label_dtype = type(annotations["label"].iloc[0]) if not annotations.empty else str
         label_map_type = type(unique_labels[0])
         if label_dtype != label_map_type:
-            vlog(f"Datatype mismatch between annotations labels ({label_dtype}) and unique_labels ({label_map_type}). Attempting to cast unique_labels.", LogLevel.ERROR)
+            vlog(f"Datatype mismatch between annotations labels ({label_dtype}) and unique_labels ({label_map_type}). Attempting to cast unique_labels.", LogLevel.WARNING)
             try:
                 unique_labels = [label_dtype(label) for label in unique_labels]
             except Exception as e:
@@ -501,14 +501,7 @@ def train_with_estimate_comparison(
     )
     vlog(f"Adjusted batch size to [green]{adjusted_batch_size}[/] for model {model_cls.__name__}")
     # Estimate memory
-    estimated_mem_mb = estimate_dynamic_vram_usage(
-        model_cls=model_cls,
-        input_dim=input_dim,
-        tiles_per_bag=tiles_per_bag,
-        batch_size=adjusted_batch_size,
-        num_classes=2,
-        return_rounded=False
-    )
+    estimated_mem_mb = estimate_model_size(Attention_MIL, adjusted_batch_size, tiles_per_bag, input_dim, False)
 
     config = mil_config(
         model="attention_mil",
@@ -568,7 +561,6 @@ def train_with_estimate_comparison(
         )
 
         # Cleanup
-        # TODO | Check if this is necessary
         del model, dummy_input, learner
         torch.cuda.empty_cache()
 

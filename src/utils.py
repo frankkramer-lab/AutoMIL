@@ -111,7 +111,7 @@ def get_vlog(verbose: bool) -> Callable:
     Returns:
         Logging function that conditionally logs messages.
     """
-    def _vlog(message: str, log_level: LogLevel) -> None:
+    def _vlog(message: str, log_level: LogLevel = LogLevel.INFO) -> None:
         if verbose:
             match log_level:
                 case LogLevel.INFO:

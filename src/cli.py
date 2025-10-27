@@ -108,7 +108,7 @@ def run_pipeline(
     except Exception as e:
         tb = traceback.format_exc()
         vlog(tb, LogLevel.ERROR)
-        vlog(f"[{ERROR_CLR}]Error:[/] {e}", LogLevel.ERROR)
+        vlog(f"Error: {e}", LogLevel.ERROR)
         return
 
 @AutoMIL.command(name="batch-analysis", context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
@@ -148,7 +148,7 @@ def batch_analysis(
     try:
         batch_size_list = [int(bs.strip()) for bs in batch_sizes.split(',')]
     except ValueError:
-        vlog(f"[{ERROR_CLR}]Error:[/] Invalid batch sizes. Please provide comma-separated integers.", LogLevel.ERROR)
+        vlog(f"Error: Invalid batch sizes. Please provide comma-separated integers.", LogLevel.ERROR)
         return
 
     try:
@@ -199,7 +199,7 @@ def batch_analysis(
     except Exception as e:
         tb = traceback.format_exc()
         vlog(tb, LogLevel.ERROR)
-        vlog(f"[{ERROR_CLR}]Error:[/] {e}", LogLevel.ERROR)
+        vlog(f"Error: {e}", LogLevel.ERROR)
         return
 
 if __name__ == '__main__':
