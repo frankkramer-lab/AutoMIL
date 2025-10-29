@@ -11,6 +11,7 @@ import pandas as pd
 import pyvips
 import slideflow as sf
 import torch
+from numpy import ndarray
 from PIL import Image
 from slideflow.io import TFRecordWriter, write_tfrecords_multi
 from slideflow.io.torch import serialized_record
@@ -123,6 +124,31 @@ def get_vlog(verbose: bool) -> Callable:
                 case LogLevel.ERROR:
                     slideflow_log.error(message)
     return _vlog
+
+def format_ensemble_summary(
+        model_num: int,
+        confusion_matrix: ndarray,
+        auc: float,
+        ap:  float,
+        acc: float
+) -> str:
+    # Format confusion matrix nicely
+    tn, fp, fn, tp = confusion_matrix.ravel()
+    cm_formatted = f"""
+                 Predicted
+                 0     1
+    Actual 0  {tn:4d}  {fp:4d}
+           1  {fn:4d}  {tp:4d}"""
+
+    # Verbose summary with properly formatted confusion matrix
+    summary = f"""
+    Ensemble Evaluation Metrics | Models: {model_num}
+    -- AUC: {auc:.3f}
+    -- Average Precision: {ap:.3f}  
+    -- Accuracy: {acc:.3%}
+    -- Confusion Matrix:{cm_formatted}
+    """
+    return summary
 
 # --- Slide / Dataset Info ---
 

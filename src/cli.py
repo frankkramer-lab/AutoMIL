@@ -9,6 +9,7 @@ from pathlib import Path
 import click
 import slideflow as sf
 
+from evaluation import ensemble_predictions, evaluate
 from Experiments.experiment import BatchSizeExperiment
 from pipeline import (configure_image_backend, create_project_scaffold,
                       run_dataset_setup_loop, setup_dataset, setup_project,
@@ -96,13 +97,30 @@ def run_pipeline(
             skip_tiling=skip_tiling
         )
 
+        # --- Train-Test Split ---
+        train, test = dataset.split(
+            labels="label",
+            val_fraction=0.2
+        )
+
         # --- 4. Run Training ---
         train_with_estimate_comparison(
             ModelType.Attention_MIL,
             project,
-            dataset,
+            train,
             k=3,
             verbose=verbose,
+        )
+
+        # --- 5. Prediction and Ensemble ---
+        evaluate(
+            project,
+            test,
+            verbose
+        )
+        ensemble_predictions(
+            Path(project.root) / "ensemble",
+            Path(project.root) / "ensemble_predictions.csv"
         )
     
     except Exception as e:
