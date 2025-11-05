@@ -126,28 +126,56 @@ def get_vlog(verbose: bool) -> Callable:
     return _vlog
 
 def format_ensemble_summary(
-        model_num: int,
-        confusion_matrix: ndarray,
-        auc: float,
-        ap:  float,
-        acc: float
+    num_models: int,
+    confusion_matrix: np.ndarray,
+    auc: float,
+    ap: float,
+    acc: float,
+    f1: float,
 ) -> str:
-    # Format confusion matrix nicely
-    tn, fp, fn, tp = confusion_matrix.ravel()
-    cm_formatted = f"""
+    """
+    Format ensemble evaluation metrics into a readable summary.
+    
+    Args:
+        num_models: Number of models in the ensemble
+        confusion_matrix: Confusion matrix (can be binary 2x2 or multi-class NxN)
+        auc: Area under curve score
+        ap: Average precision score
+        acc: Accuracy score
+        f1: F1 score (macro for multiclass, regular for binary)
+        f1_macro: Macro F1 score (multiclass only)
+        f1_weighted: Weighted F1 score (multiclass only)
+    
+    Returns:
+        Formatted summary string
+    """
+    n_classes = confusion_matrix.shape[0]
+    
+    if n_classes == 2:
+        # Binary classification - original format
+        tn, fp, fn, tp = confusion_matrix.ravel()
+        cm_formatted = f"""
                  Predicted
                  0     1
     Actual 0  {tn:4d}  {fp:4d}
            1  {fn:4d}  {tp:4d}"""
+    else:
+        # Multi-class classification - matrix format
+        cm_formatted = "\n                 Predicted\n"
+        cm_formatted += "              " + "".join([f"{i:>6}" for i in range(n_classes)]) + "\n"
+        for i, row in enumerate(confusion_matrix):
+            cm_formatted += f"    Actual {i:>1}  " + "".join([f"{val:>6}" for val in row]) + "\n"
 
-    # Verbose summary with properly formatted confusion matrix
+    # Build metrics section
+    metrics_text = f"""-- AUC: {auc:.3f}
+-- Average Precision: {ap:.3f}  
+-- Accuracy: {acc:.3%}
+-- F1 Score: {f1:.3f}"""
     summary = f"""
-    Ensemble Evaluation Metrics | Models: {model_num}
-    -- AUC: {auc:.3f}
-    -- Average Precision: {ap:.3f}  
-    -- Accuracy: {acc:.3%}
-    -- Confusion Matrix:{cm_formatted}
-    """
+Ensemble Evaluation Metrics | Models: {num_models} | Classes: {n_classes}
+{metrics_text}
+-- Confusion Matrix:{cm_formatted}
+"""
     return summary
 
 # --- Slide / Dataset Info ---
@@ -506,7 +534,7 @@ def pretiled_to_tfrecords(
     verbose: bool = True
 ):
     """
-    Convert loose .tif/.tiff tiles organized by slide subfolders into TFRecords,
+    Convert loose tiles organized by slide subfolders into TFRecords,
     assigning sequential indices compatible with Slideflow.
 
     Expected structure:
@@ -547,10 +575,11 @@ def pretiled_to_tfrecords(
         if tfrecord_path.exists() and not overwrite:
             vlog(f"{tfrecord_path} already exists. Skipping.")
             continue
-            
-        tile_paths = sorted(list(slide_dir.glob("*.tif")) + list(slide_dir.glob("*.tiff")))
+        
+        extensions = [".png", ".svs", ".tif", ".tiff"]
+        tile_paths = sorted([tile for tile in slide_dir.iterdir() if tile.suffix in extensions])
         if not tile_paths:
-            vlog(f"No .tif/.tiff files found in {slide_dir}, skipping.")
+            vlog(f"No tiles found in {slide_dir}, skipping.")
             continue
 
         writer = TFRecordWriter(str(tfrecord_path))

@@ -306,8 +306,6 @@ def setup_dataset(
             tiff_conversion=tiff_conversion,
             clear_buffer=True
         )
-        if not success:
-            raise Exception("Tile extraction failed.")
         vlog(f"[{SUCCESS_CLR}]Finished extracting tiles[/]\n")
 
     # bags will be stored in project/bags/...
@@ -337,16 +335,12 @@ def extract_tiles(
     
     # Default case: no tiff conversion required, slides are already in a suitable format
     if not tiff_conversion:
-        try:
-            dataset.extract_tiles(
-                qc=qc.Otsu(),
-                normalizer="reinhard_mask",
-                report=True
-            )
-            return True
-        except Exception as e:
-            log.error(f"Error extracting tiles: {e}")
-            return False
+        dataset.extract_tiles(
+            qc=qc.Otsu(),
+            normalizer="reinhard_mask",
+            report=True
+        )
+        return True
     # Exception: tiff conversion required, slides are in unsuitable format (e.g .png)
     else:
         slide_list = [Path(slide) for slide in dataset.slide_paths()]

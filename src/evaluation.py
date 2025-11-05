@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import slideflow as sf
 from sklearn.metrics import (accuracy_score, average_precision_score,
-                             confusion_matrix, roc_auc_score)
+                             confusion_matrix, f1_score, roc_auc_score)
 from slideflow.mil import eval_mil
 
 from utils import LogLevel, format_ensemble_summary, get_vlog
@@ -81,6 +82,7 @@ def ensemble_predictions(
     vlog = get_vlog(verbose)
     predictions: list[pd.DataFrame] = []
 
+    # === Loading Predictions ===
     # Iterate over subdirectories of the model dir (Ideally these should contain a model each)
     for idx, submodel_dir in enumerate([entry for entry in model_dir.iterdir() if entry.is_dir()]):
         try:
@@ -90,7 +92,7 @@ def ensemble_predictions(
             # Add model index to prediction columns for later merging
             pred_columns = [column for column in prediction.columns if column.startswith("y_pred")]
             rename_map = {pred_column: f"{pred_column}_model{idx}" for pred_column in pred_columns}
-            prediction = prediction.rename(columns=rename_map)  # Fix: assign back to prediction
+            prediction = prediction.rename(columns=rename_map)
             predictions.append(prediction)
             
             vlog(f"Loaded model {idx} predictions with columns: {list(prediction.columns)}")
@@ -102,68 +104,109 @@ def ensemble_predictions(
     if not predictions:
         raise ValueError("No valid prediction files found in model directory")
 
+    # === Merging Predictions ===
     # Start with the first model's predictions
     merged = predictions[0].copy()
-    
-    # Merge remaining predictions one by one
+
     for prediction in predictions[1:]:
-        # Get only the prediction columns from this model (avoid merging duplicate slide/y_true)
-        pred_cols_only = [column for column in prediction.columns if column.startswith("y_pred")]
-        merge_df = prediction[["slide", "y_true"] + pred_cols_only].copy()
-        
-        # Merge with explicit suffixes to handle any remaining conflicts
+        # y_pred'x' column holds the prediction probabiliy for class 'x'
+        pred_columns = [column for column in prediction.columns if column.startswith("y_pred")]
+        to_merge = prediction[["slide", "y_true"] + pred_columns].copy()
+
+        # Merge on identifiers (slide id and label)
         merged = merged.merge(
-            merge_df, 
+            to_merge, 
             on=["slide", "y_true"], 
             how="inner",
         )
-
-    # Get all prediction columns for ensemble averaging
-    all_pred_cols = [column for column in merged.columns if column.startswith("y_pred") and "model" in column]
-    if not all_pred_cols:
-        raise ValueError("No prediction columns found for ensembling")
-
-    # For binary classification, assume we want to ensemble the positive class probabilities
-    # If we have y_pred0 and y_pred1, use y_pred1 (positive class)
-    positive_class_cols = []
-    for model_idx in range(len(predictions)):
-        # Look for positive class prediction column for this model
-        pos_col = None
-        for col in all_pred_cols:
-            if f"model{model_idx}" in col:
-                if "y_pred1" in col or (len([c for c in all_pred_cols if f"model{model_idx}" in c]) == 1):
-                    pos_col = col
-                    break
-        if pos_col:
-            positive_class_cols.append(pos_col)
     
-    if not positive_class_cols:
-        # Fallback: use all prediction columns
-        positive_class_cols = all_pred_cols
+    # === Ensemble ===
+    # Get all prediction columns from merged table
+    all_pred_columns = [
+        column for column in merged.columns
+        if column.startswith("y_pred")
+    ]
+    if not all_pred_columns:
+        raise ValueError("No prediction columns found for ensembling")
+    
+    unique_classes = sorted(merged["y_true"].unique())
+    n_classes = len(unique_classes)
 
-    # Ensemble soft voting (average model prediction probabilities)
-    merged["y_pred_ensemble"] = merged[positive_class_cols].mean(axis=1)
-    merged["y_pred_label"] = (merged["y_pred_ensemble"] >= 0.5).astype(int)
+    # Get prediction columns per class
+    class_prediction_columns = {}
+    for class_idx in unique_classes:
+        class_prediction_columns[class_idx] = [
+            column for column in all_pred_columns
+            if column.startswith(f"y_pred{class_idx}_")
+        ]
+    
+    # Calculate ensemble (average) probabilities
+    ensemble_probs = {}
+    for class_idx in unique_classes:
+        # If we have predictions for this class
+        if class_prediction_columns[class_idx]:
+            # Calculate average of prediction probs
+            ensemble_probs[f"y_pred{class_idx}_ensemble"] = merged[
+                class_prediction_columns[class_idx]
+            ].mean(axis=1)
+        else:
+            vlog(f"No prediction columns found for class {class_idx}")
+            # Dummy column
+            ensemble_probs[f"y_pred{class_idx}_ensemble"] = 0.0
 
-    # Compute metrics
+    # Add ensemble probabilities to DataFrame
+    for column, probability in ensemble_probs.items():
+        merged[column] = probability
+
+    # Retrieve probability matrix
+    ensemble_probability_columns = [f"y_pred{class_idx}_ensemble" for class_idx in unique_classes]
+    prob_matrix = merged[ensemble_probability_columns].values
+
+    # Transform probabilities to distinct prediction (largest probability)
+    predicted_classes = np.argmax(prob_matrix, axis=1)
+    merged["y_pred_label"] = predicted_classes
+
+    # Collect ground truth and prediction for metric calculation
     y_true = merged["y_true"].astype(int)
-    y_prob = merged["y_pred_ensemble"]
-    y_pred = merged["y_pred_label"]
+    y_pred = merged["y_pred_label"].astype(int)
 
-    auc = roc_auc_score(y_true, y_prob)
-    ap = average_precision_score(y_true, y_prob)
+    # === Calculating Metrics ===
+    # Binary
+    if n_classes == 2:
+        y_probs = prob_matrix[:, 1] # label 1 probabilites
+
+        auc = roc_auc_score(y_true, y_probs)
+        ap = average_precision_score(y_true, y_probs)
+        f1 = f1_score(y_true, y_pred)
+
+    # Multiclass
+    else:
+        auc = roc_auc_score(y_true, prob_matrix, multi_class="ovr", average="macro")
+
+        # Calculate AP for each class
+        ap_scores = []
+        for class_idx in unique_classes:
+            ap_class = average_precision_score(y_true, prob_matrix[:, class_idx])
+            ap_scores.append(ap_class)
+        ap = np.mean(ap_scores) if ap_scores else 0.0
+
+        f1 = f1_score(y_true, y_pred, average="macro")
+    
     acc = accuracy_score(y_true, y_pred)
     cm = confusion_matrix(y_true, y_pred)
 
-    # Verbose summary (ensure metrics are native Python floats for format_ensemble_summary)
+    # === Summary ===
     summary = format_ensemble_summary(
         len(predictions),
         cm,
         float(auc),
         float(ap),
-        float(acc)
+        float(acc),
+        float(f1)
     )
     vlog(summary)
+
+    # === TODO | Plots ===
 
     # Save results
     if output_path:
@@ -174,4 +217,11 @@ def ensemble_predictions(
             merged.to_parquet(output_path, index=False)
         vlog(f"Ensemble predictions saved to {output_path}")
 
-    return merged, {"AUC": auc, "AP": ap, "Accuracy": acc, "ConfusionMatrix": cm}
+    metrics = {
+        "AUC": auc, 
+        "AP": ap, 
+        "Accuracy": acc, 
+        "F1": f1,
+        "ConfusionMatrix": cm
+    }
+    return merged, metrics
