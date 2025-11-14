@@ -31,6 +31,8 @@ def AutoMIL():
 @click.option("-pc", "--patient_column", type=str, default="patient",   help="Name of the column containing patient IDs")
 @click.option("-lc", "--label_column",   type=str, default="label",     help="Name of the column containing labels")
 @click.option("-sc", "--slide_column",   type=str, default=None,        help="Name of the column containing slide names")
+@click.option("-r", "--resolutions",     type=str, default="Low,Ultra_Low",
+              help=f"Comma-separated list of resolution presets ({','.join(RESOLUTION_PRESETS.__members__.keys())}) to train on")
 @click.option("-k",                      type=int, default=3,           help="number of folds to train per resolution level")
 @click.option("-t", "--transform_labels", is_flag=True,                 help="Transforms labels to float values (0.0, 1.0, ...)")
 @click.option("-s", "--skip_tiling",      is_flag=True,                 help="Skips the tiling step (assumes tiles are already extracted)")
@@ -43,6 +45,7 @@ def run_pipeline(
     patient_column:  str,
     label_column:    str,
     slide_column:    str,
+    resolutions:     str,
     k:               int,
     transform_labels: bool,
     skip_tiling:      bool,
@@ -58,8 +61,22 @@ def run_pipeline(
     """
     vlog = get_vlog(verbose)
     sf.setLoggingLevel(10) # INFO: 20, DEBUG: 10
-
+    vlog("Starting AutoMIL pipeline...")
     try:
+        # --- Parse Resolution Presets ---
+        resolution_names:  list[str] = [res.strip() for res in resolutions.split(',')]
+        available_presets: list[str] = [name for name in dir(RESOLUTION_PRESETS) if not name.startswith('_')]
+        resolution_presets: list[RESOLUTION_PRESETS] = []
+        
+        for res_name in resolution_names:
+            if res_name in available_presets:
+                resolution_presets.append(RESOLUTION_PRESETS[res_name])
+            else:
+                vlog(f"Invalid resolution preset '{res_name}'. Available presets: {available_presets}", LogLevel.ERROR)
+                continue
+                
+        vlog(f"Using resolution presets: {[preset.name for preset in resolution_presets]}")
+
         # --- 1. Image Backend Configuration ---
         png_slides_present: bool = any(
             [slide.suffix.lower() == ".png" for slide in Path(slide_dir).iterdir()]
@@ -87,41 +104,63 @@ def run_pipeline(
         )
 
         # --- 3. Setup Dataset Sources ---
-        dataset = setup_dataset(
-            project,
-            RESOLUTION_PRESETS.Low,
-            label_map,
-            Path(slide_dir),
-            verbose=verbose,
-            tiff_conversion=tiff_conversion,
-            skip_tiling=skip_tiling
-        )
+        datasets: dict[str, sf.Dataset] = {}
+        for preset in resolution_presets:
+            vlog(f"Setting up dataset for resolution preset: {preset.name}")
+
+            datasets[preset.name] = setup_dataset(
+                project,
+                preset,
+                label_map,
+                Path(slide_dir),
+                verbose=verbose,
+                tiff_conversion=tiff_conversion,
+                skip_tiling=skip_tiling
+            )
+            vlog(f"Dataset setup complete for resolution preset: {preset.name}")
 
         # --- Train-Test Split ---
-        train, test = dataset.split(
+        # Using the dataset from the first resolution preset for splitting
+        dataset = datasets[resolution_presets[0].name]
+        original_train, original_test = dataset.split(
             labels="label",
             val_fraction=0.2
         )
+        train_slides = original_train.slides()
+        test_slides  = original_test.slides()
 
-        # --- 4. Run Training ---
-        train_with_estimate_comparison(
-            ModelType.Attention_MIL,
-            project,
-            train,
-            k=3,
-            verbose=verbose,
-        )
+        train_test_splits: dict[str, tuple[sf.Dataset, sf.Dataset]] = {}
+        for preset_name, dataset in datasets.items():
+            train = dataset.filter(filters={"slide": train_slides})
+            test  = dataset.filter(filters={"slide": test_slides})
+            train_test_splits[preset_name] = (train, test)
+        
+        for preset_name, (train, test) in train_test_splits.items():
+            vlog(f"Train/Test split for resolution preset '{preset_name}': "
+                 f"{len(train.slides())} train slides, {len(test.slides())} test slides."
+            )
 
-        # --- 5. Prediction and Ensemble ---
-        evaluate(
-            project,
-            test,
-            verbose
-        )
-        ensemble_predictions(
+            train_with_estimate_comparison(
+                ModelType.Attention_MIL,
+                project,
+                train,
+                k=k,
+                verbose=verbose,
+            )
+
+            # --- 5. Prediction and Ensemble ---
+            evaluate(
+                project,
+                test,
+                verbose
+            )
+        
+        preds, metrics = ensemble_predictions(
             Path(project.root) / "ensemble",
-            Path(project.root) / "ensemble_predictions.csv"
+            Path(project.root) / "ensemble_predictions.csv",
+            verbose = verbose
         )
+        vlog(metrics)
     
     except Exception as e:
         tb = traceback.format_exc()

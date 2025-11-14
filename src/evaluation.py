@@ -134,7 +134,7 @@ def ensemble_predictions(
 
     # Get prediction columns per class
     class_prediction_columns = {}
-    for class_idx in unique_classes:
+    for class_idx in range(n_classes):
         class_prediction_columns[class_idx] = [
             column for column in all_pred_columns
             if column.startswith(f"y_pred{class_idx}_")
@@ -142,7 +142,7 @@ def ensemble_predictions(
     
     # Calculate ensemble (average) probabilities
     ensemble_probs = {}
-    for class_idx in unique_classes:
+    for class_idx in range(n_classes):
         # If we have predictions for this class
         if class_prediction_columns[class_idx]:
             # Calculate average of prediction probs
@@ -185,11 +185,18 @@ def ensemble_predictions(
 
         # Calculate AP for each class
         ap_scores = []
-        for class_idx in unique_classes:
-            ap_class = average_precision_score(y_true, prob_matrix[:, class_idx])
-            ap_scores.append(ap_class)
-        ap = np.mean(ap_scores) if ap_scores else 0.0
+        for class_idx in range(n_classes):
+            # Convert to binary classification: class vs all others
+            y_true_binary = (y_true == class_idx).astype(int)
+            y_score_binary = prob_matrix[:, class_idx]
 
+            # Only compute AP if both classes are present (avoid degenerate cases)
+            if len(np.unique(y_true_binary)) > 1:
+                ap_class = average_precision_score(y_true_binary, y_score_binary)
+                ap_scores.append(ap_class)
+            else:
+                vlog(f"Warning: Class {class_idx} not present in test set, skipping AP calculation")
+        ap = np.mean(ap_scores) if ap_scores else 0.0
         f1 = f1_score(y_true, y_pred, average="macro")
     
     acc = accuracy_score(y_true, y_pred)

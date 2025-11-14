@@ -301,9 +301,11 @@ def setup_dataset(
         
     else:
         vlog(f"Extracting tiles at [{INFO_CLR}]{magnification}[/] | Tile size: [{INFO_CLR}]{tile_size}[/]")
-        success = extract_tiles(
+        extract_tiles(
+            project,
             dataset,
             tiff_conversion=tiff_conversion,
+            mpp_override=mpp,
             clear_buffer=True
         )
         vlog(f"[{SUCCESS_CLR}]Finished extracting tiles[/]\n")
@@ -328,8 +330,11 @@ def setup_dataset(
     return dataset
 
 def extract_tiles(
+        project: sf.Project,
         dataset: sf.Dataset,
         tiff_conversion: bool = False,
+        tiff_dir: Optional[Path] = None,
+        mpp_override: float | None = None,
         clear_buffer:    bool = True
 ) -> bool:
     
@@ -344,22 +349,37 @@ def extract_tiles(
     # Exception: tiff conversion required, slides are in unsuitable format (e.g .png)
     else:
         slide_list = [Path(slide) for slide in dataset.slide_paths()]
-        tfrecords_path = Path(dataset.tfrecords_folders()[0])  # Should be project_dir / tfrecords / {tile_size}px_{tile_size}um
         batch_size = 10
 
+
+        tiff_dir = Path(project.root) / "tiffs" if tiff_dir is None else tiff_dir
+        tiff_dir.mkdir(parents=True, exist_ok=True)
+
+        # Add tiff buffer as slide source to project
+        project.add_source(
+            name="Tiff_Buffer",
+            slides=str(tiff_dir)
+        )
+        # Setup new dataset with tiff buffer as slide source
+        tiff_buffer = project.dataset(
+            sources=["Tiff_Buffer"],
+            tile_px=dataset.tile_px,
+            tile_um=dataset.tile_um
+        )
+        
         for batch_idx, batch in enumerate(batch_generator(slide_list, batch_size=batch_size)):
             # Multithreaded .png -> .tiff conversion
             batch_conversion_concurrent(
                 batch,
-                Path(dataset.tfrecords_folders()[0]) # Should be project_dir / tfrecords / {tile_size}px{tile_size}um
+                tiff_dir
             )
 
             # Tile extraction for batch
             try:
-                dataset.extract_tiles(
-                    slides=batch,
+                tiff_buffer.extract_tiles(
                     qc=qc.Otsu(),   
-                    normalizer="reinhard_mask", 
+                    normalizer="reinhard_mask",
+                    mpp_override=mpp_override,
                 )
             except Exception as e:
                 log.error(f"Error extracting tiles for batch {batch_idx}: {e}")
@@ -367,7 +387,7 @@ def extract_tiles(
             
             # Cleans up the current .tiff buffer after each batch
             if clear_buffer:
-                for tiff in [file for file in tfrecords_path.iterdir() if file.suffix == ".tiff"]:
+                for tiff in [file for file in tiff_dir.iterdir() if file.suffix == ".tiff"]:
                     try:
                         tiff.unlink()
                     except Exception as e:
