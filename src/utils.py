@@ -384,8 +384,7 @@ def convert_worker(in_path: Path, out_folder: Path, verbose: bool = True) -> Pat
 
     # Skip already converted images
     if out_path.exists():
-        if verbose:
-            print(f"{out_path} already exists. Skipping")
+        vlog(f"{out_path} already exists. Skipping")
         return out_path
 
     if err := convert_img_to_tiff(in_path, out_path):

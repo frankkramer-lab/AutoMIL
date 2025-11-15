@@ -9,12 +9,13 @@ from pathlib import Path
 import click
 import slideflow as sf
 
+from dataset import Dataset
 from evaluation import ensemble_predictions, evaluate
 from Experiments.experiment import BatchSizeExperiment
 from pipeline import (configure_image_backend, create_project_scaffold,
-                      run_dataset_setup_loop, setup_dataset, setup_project,
+                      setup_dataset, setup_project,
                       train_with_estimate_comparison)
-from utils import ERROR_CLR, RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
+from utils import RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
@@ -108,14 +109,13 @@ def run_pipeline(
         for preset in resolution_presets:
             vlog(f"Setting up dataset for resolution preset: {preset.name}")
 
-            datasets[preset.name] = setup_dataset(
-                project,
+            datasets[preset.name] = Dataset(project, verbose).prepare_dataset_source(
                 preset,
                 label_map,
-                Path(slide_dir),
-                verbose=verbose,
+                slide_dir=Path(slide_dir),
+                bags_dir=Path(project_dir) / "bags",
+                pretiled=skip_tiling,
                 tiff_conversion=tiff_conversion,
-                skip_tiling=skip_tiling
             )
             vlog(f"Dataset setup complete for resolution preset: {preset.name}")
 
