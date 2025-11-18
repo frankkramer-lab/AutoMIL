@@ -248,13 +248,26 @@ class Dataset():
         else:
             self.vlog(f"Preparing TIFF conversion pipeline ({tile_size}px @ {magnification})")
 
+            # Permanent tiff buffer directory
+            tiff_dir = Path(self.project.root) / "tiffs"
+            tiff_dir.mkdir(parents=True, exist_ok=True)
+
+            # Need to register a dataset source for the tiff buffer
+            if "tiff_buffer" not in self.project.sources:
+                self.project.add_source("tiff_buffer", slides=str(tiff_dir))
+            tiff_dataset = self.project.dataset(
+                sources=["tiff_buffer"],
+                tile_px=dataset.tile_px,
+                tile_um=dataset.tile_um,
+            )
+
+            # Prepare TFRecords directory
+            tfrecords_dir = Path(tiff_dataset.tfrecords_folders()[0])
+            tfrecords_dir.mkdir(parents=True, exist_ok=True)
+
             # Retieve slide paths and IDs
             slide_list: list[Path] = [path for p in dataset.slide_paths() if (path := Path(p)).exists()]
-            slide_ids:  list[str]  = [slide.stem for slide in slide_list]
-
-            # Prepare Tfrecords directory
-            tfrecords_dir = Path(dataset.tfrecords_folders()[0])
-            tfrecords_dir.mkdir(parents=True, exist_ok=True)
+            slide_ids:  list[str]  = list(set(slide.stem for slide in slide_list)) # Using a set to avoid duplicates
 
             # Caution: Make sure the tfrecords dont actually exist yet (e.g., from previous runs)
             expected_tfrecords = {sid: tfrecords_dir / f"{sid}.tfrecords" for sid in slide_ids}
@@ -274,18 +287,7 @@ class Dataset():
 
             # Only convert still missing slides
             missing_slides = [slide for slide in slide_list if slide.stem in missing]
-            # Permanent tiff buffer directory
-            tiff_dir = Path(self.project.root) / "tiffs"
-            tiff_dir.mkdir(parents=True, exist_ok=True)
 
-            # Need to register a dataset source for the tiff buffer
-            if "tiff_buffer" not in self.project.sources:
-                self.project.add_source("tiff_buffer", slides=str(tiff_dir))
-            tiff_dataset = self.project.dataset(
-                sources=["tiff_buffer"],
-                tile_px=dataset.tile_px,
-                tile_um=dataset.tile_um,
-            )
             # Size of the tiff buffer batches
             # TODO | Should probably be configurable
             buffer_size = 10

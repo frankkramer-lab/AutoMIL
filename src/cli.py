@@ -15,6 +15,7 @@ from Experiments.experiment import BatchSizeExperiment
 from pipeline import (configure_image_backend, create_project_scaffold,
                       setup_dataset, setup_project,
                       train_with_estimate_comparison)
+from project import Project
 from utils import RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -88,22 +89,19 @@ def run_pipeline(
         tiff_conversion = png_slides_present
 
         # --- 2. Project Creation And Setup ---
-        modified_annotation_file, label_map = create_project_scaffold(
+        project_setup = Project(
             Path(project_dir),
             Path(annotation_file),
+            Path(slide_dir),
             patient_column,
             label_column,
             slide_column,
-            verbose=verbose,
-            transform_labels=transform_labels,
+            transform_labels,
+            verbose,
         )
-        project: sf.Project = setup_project(
-            Path(slide_dir),
-            Path(project_dir),
-            modified_annotation_file,
-            verbose=verbose,
-        )
-
+        project = project_setup.prepare_project()
+        label_map = project_setup.get_label_map()
+        
         # --- 3. Setup Dataset Sources ---
         datasets: dict[str, sf.Dataset] = {}
         for preset in resolution_presets:
@@ -155,12 +153,11 @@ def run_pipeline(
                 verbose
             )
         
-        preds, metrics = ensemble_predictions(
+        ensemble_predictions(
             Path(project.root) / "ensemble",
             Path(project.root) / "ensemble_predictions.csv",
             verbose = verbose
         )
-        vlog(metrics)
     
     except Exception as e:
         tb = traceback.format_exc()

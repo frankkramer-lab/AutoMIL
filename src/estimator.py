@@ -504,6 +504,6 @@ def estimate_model_size(model: type[nn.Module], batch_size: int, bag_size: int, 
     estimated_mem_mb, _ = UnifiedSizeEstimator(
         model=model(n_feats=input_dim, n_out=2),
         input_size=(batch_size, bag_size, input_dim),
-        bits=32
+        bits=16
     ).estimate_size(include_memory_overhead=False)
     return estimated_mem_mb
