@@ -101,20 +101,26 @@ def run_pipeline(
         )
         project = project_setup.prepare_project()
         label_map = project_setup.get_label_map()
+
+        project_setup.summary()
         
         # --- 3. Setup Dataset Sources ---
         datasets: dict[str, sf.Dataset] = {}
         for preset in resolution_presets:
             vlog(f"Setting up dataset for resolution preset: {preset.name}")
 
-            datasets[preset.name] = Dataset(project, verbose).prepare_dataset_source(
+            dataset = Dataset(
+                project,
                 preset,
                 label_map,
                 slide_dir=Path(slide_dir),
                 bags_dir=Path(project_dir) / "bags",
                 pretiled=skip_tiling,
                 tiff_conversion=tiff_conversion,
+                verbose=verbose
             )
+            dataset.summary()
+            datasets[preset.name] = dataset.prepare_dataset_source()
             vlog(f"Dataset setup complete for resolution preset: {preset.name}")
 
         # --- Train-Test Split ---
@@ -133,9 +139,9 @@ def run_pipeline(
             test  = dataset.filter(filters={"slide": test_slides})
             train_test_splits[preset_name] = (train, test)
         
-        for preset_name, (train, test) in train_test_splits.items():
+        for preset_name, (train, _) in train_test_splits.items():
             vlog(f"Train/Test split for resolution preset '{preset_name}': "
-                 f"{len(train.slides())} train slides, {len(test.slides())} test slides."
+                 f"{len(train.slides())} train slides"
             )
 
             train_with_estimate_comparison(
@@ -146,12 +152,12 @@ def run_pipeline(
                 verbose=verbose,
             )
 
-            # --- 5. Prediction and Ensemble ---
-            evaluate(
-                project,
-                test,
-                verbose
-            )
+        # --- 5. Prediction and Ensemble ---
+        evaluate(
+            project,
+            original_test,
+            verbose
+        )
         
         ensemble_predictions(
             Path(project.root) / "ensemble",

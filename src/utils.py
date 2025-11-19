@@ -53,6 +53,16 @@ class RESOLUTION_PRESETS(Enum):
     High  = (299, "20x")
     Ultra = (224, "40x")
 
+    @property
+    def tile_px(self) -> int:
+        """Tile size in pixels"""
+        return self.value[0]
+    
+    @property
+    def magnification(self) -> str:
+        """Tile magnification level"""
+        return self.value[1]
+
 # Based on commonly cited microns per pixel (mpp) values for different default magnifications
 COMMON_MPP_VALUES = {
     "20x": 0.5,

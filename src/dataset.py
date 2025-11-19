@@ -10,6 +10,7 @@ import pandas as pd
 import slideflow as sf
 import torch
 from slideflow.slide import qc
+from tabulate import tabulate
 
 from utils import (COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR,
                    RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel,
@@ -24,6 +25,12 @@ class Dataset():
     def __init__(
         self,
         project: sf.Project,
+        resolution: RESOLUTION_PRESETS,
+        label_map: dict | list[str],
+        slide_dir: Path | None = None,
+        bags_dir:  Path | None = None,
+        pretiled:  bool = False,
+        tiff_conversion: bool = False,
         verbose: bool = True
         ) -> None:
         """Prepare and manage dataset sources for AutoMIL
@@ -33,18 +40,23 @@ class Dataset():
             verbose (bool, optional): Whether to print verbose messages. Defaults to True.
         """
         self.project = project
-        self.verbose = verbose
-        self.vlog = get_vlog(verbose)
+        self.resolution = resolution
 
-    def prepare_dataset_source(
-        self,
-        resolution: RESOLUTION_PRESETS,
-        label_map: dict | list[str],
-        slide_dir: Path | None = None,
-        bags_dir:  Path | None = None,
-        pretiled:  bool = False,
-        tiff_conversion: bool = False,
-        ) -> sf.Dataset:
+        self.slide_dir = slide_dir
+        self.bags_dir  = bags_dir
+
+        self.vlog = get_vlog(verbose)
+        # Getting some resolution (related) parameters
+        self.tile_px = resolution.tile_px
+        self.magnification = resolution.magnification
+        self.mpp = self._compute_mpp(self.magnification, self.slide_dir, by_average=True)
+        self.tile_um = int(self.tile_px * self.mpp)
+
+        self.label_map = label_map
+        self.pretiled = pretiled
+        self.tiff_conversion = tiff_conversion
+
+    def prepare_dataset_source(self) -> sf.Dataset:
         """Prepares a single dataset source for a given resolution preset.
 
         Performs the following steps:
@@ -66,33 +78,57 @@ class Dataset():
         Returns:
             sf.Dataset: A slideflow dataset
         """
-
-        tile_size, magnification = resolution.value
-
-        # Compute appropriate MPP for slides
-        mpp = self._compute_mpp(magnification, slide_dir, by_average=True)
-
-        # Compute tile_um
-        tile_um = int(tile_size * mpp)
+        res_name = self.resolution.name
+        tile_px, magnification, tile_um = self.tile_px, self.magnification, self.tile_um
 
         # Prepare dataset source
-        self.vlog(f"Preparing dataset source at resolution [{INFO_CLR}]{resolution.name} ({tile_size}px, {tile_um:.2f}um)[/]")
-        dataset = self.project.dataset(tile_px=tile_size, tile_um=tile_um)
+        self.vlog(f"Preparing dataset source at resolution [{INFO_CLR}]{res_name} ({tile_px}px, {tile_um:.2f}um)[/]")
+        dataset = self.project.dataset(tile_px=tile_px, tile_um=tile_um)
         # Filter dataset by with label map
-        dataset = self._apply_label_filter(dataset, label_map)
+        dataset = self._apply_label_filter(dataset, self.label_map)
 
         # Convert pretiled to tfrecords
-        if pretiled:
-            if slide_dir is None:
+        if self.pretiled:
+            if self.slide_dir is None:
                 raise ValueError("slide_dir must be provided when pretiled=True")
-            dataset = self._convert_pretiled(dataset, slide_dir)
+            dataset = self._convert_pretiled(dataset, self.slide_dir)
         else:
-            self._extract_tiles(dataset, magnification, tile_size, tiff_conversion, mpp)
+            self._extract_tiles(dataset, magnification, tile_px, self.tiff_conversion, self.mpp)
 
-        self._extract_features(dataset, bags_dir)
+        self._extract_features(dataset, self.bags_dir)
         return dataset
     
-    # === Internals ===
+    def summary(self) -> None:
+        """Prints a summary of the dataset
+
+        Example:
+            ```
+            ╒═══════════════════╤═══════════╕                                                                                                                                                                                               
+            │ Resolution Preset │ Low       │                                                                                                                                                                                               
+            │ Tile Size (px)    │ 1000px    │                                                                                                                                                                                               
+            │ Magnification     │ 10xx      │                                                                                                                                                                                               
+            │ Microns-Per-Pixel │ 1.000um   │                                                                                                                                                                                               
+            │ Tile Size (um)    │ 1000.00um │                                                                                                                                                                                               
+            │ Pretiled Input    │ False     │                                                                                                                                                                                               
+            │ TIFF Conversion   │ True      │                                                                                                                                                                                               
+            ╘═══════════════════╧═══════════╛ 
+            ```
+        """
+        vlog = self.vlog
+
+        table = [
+            ("Resolution Preset", self.resolution.name),
+            ("Tile Size (px)",    f"{self.tile_px}px"),
+            ("Magnification",     f"{self.magnification}"),
+            ("Microns-Per-Pixel", f"{self.mpp:.3f}"),
+            ("Tile Size (um)",    f"{self.tile_um:.2f}um"),
+            ("Pretiled Input",    f"{self.pretiled}"),
+            ("TIFF Conversion",   f"{self.tiff_conversion}"),
+        ]
+        vlog(f"[bold underline]Dataset Summary:[/]")
+        vlog(tabulate(table, tablefmt="fancy_outline"))
+
+    # === Internals === #
     def _compute_mpp(
         self,
         magnification: str,
@@ -153,7 +189,7 @@ class Dataset():
         # Retrieve annotation dtypes and cast if necessary
         annotations = dataset.annotations if dataset.annotations is not None else pd.DataFrame()
         if not annotations.empty:
-            ann_type = type(annotations["label"].iloc[0])
+            ann_type = type(annotations["label"].iat[0])
             unique_type = type(unique_labels[0])
 
             if ann_type != unique_type:
@@ -169,7 +205,6 @@ class Dataset():
             filters={"label": unique_labels},
         )
     
-
     def _convert_pretiled(
         self,
         dataset: sf.Dataset,

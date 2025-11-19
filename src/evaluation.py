@@ -43,6 +43,7 @@ def load_and_validate_predictions(model_path: Path) -> pd.DataFrame:
 def evaluate(
     project: sf.Project,
     dataset: sf.Dataset,
+    attention_heatmaps: bool = False,
     verbose: bool = True
 ):
     vlog = get_vlog(verbose)
@@ -60,7 +61,8 @@ def evaluate(
             bags=str(bags_path),
             dataset=dataset,
             outcomes="label",
-            outdir=str(ensemble_dir)
+            outdir=str(ensemble_dir),
+            attention_heatmaps=attention_heatmaps
         )
 
 
