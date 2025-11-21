@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+from functools import cached_property
 from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
 import slideflow as sf
-import torch
-from slideflow.slide import qc
 from slideflow.util import is_project
 from tabulate import tabulate
 
@@ -79,12 +78,19 @@ class Project:
         self.slide_column = slide_column
 
         self.transform_labels = transform_labels
-        self.verbose = verbose
         self.vlog = get_vlog(verbose)
 
         self.project: sf.Project | None = None
         self.modified_annotations: Path | None = None
         self.label_map: dict | list[str] | None = None
+
+    @cached_property
+    def required_columns(self) -> set[str]:
+        """Required columns for annotations file"""
+        required = {self.patient_column, self.label_column}
+        if self.slide_column:
+            required.add(self.slide_column)
+        return required
 
     # === Public Methods === #
     def prepare_project(self) -> sf.Project:
@@ -101,13 +107,7 @@ class Project:
             sf.Project: A slideflow project instance
         """
         # Create project scaffold
-        self._create_project_scaffold(
-            self.annotations_file,
-            self.patient_column,
-            self.label_column,
-            self.slide_column,
-            self.transform_labels
-        )
+        self._create_project_scaffold()
 
         # Load or create project
         if is_project(str(self.project_dir)):
@@ -121,7 +121,6 @@ class Project:
                 slides=str(self.slide_dir),
                 annotations=str(self.modified_annotations),
             )
-
         return self.project
     
     def get_label_map(self) -> dict | list[str]:
@@ -170,14 +169,7 @@ class Project:
         vlog(tabulate(table, tablefmt="fancy_outline"))
 
     # === Internals === #
-    def _setup_annotations(
-        self,
-        annotations_file: Path,
-        patient_column: str,
-        label_column: str,
-        slide_column: str | None,
-        transform_labels: bool
-    ) -> tuple[Path, dict | list[str]]:
+    def _setup_annotations(self) -> None:
         """
         Normalize the input annotations file to the required format.
 
@@ -193,11 +185,6 @@ class Project:
             - slide   | contains slide identifiers
             - label   | contains labels
 
-        Returns:
-            tuple[Path, dict | list[str]]:
-                - Path to the saved normalized annotations CSV.
-                - Label map (dict if transform_labels=True, else list of unique labels).
-
         Raises:
             ValueError:
                 If required columns are missing.
@@ -205,30 +192,31 @@ class Project:
                 If the output annotations file cannot be written.
         """
         # Make sure given columns exist
-        if not contains_columns(annotations_file, self._get_required_columns()):
+        if not contains_columns(self.annotations_file, self.required_columns):
             raise ValueError(f"Annotations file is missing required columns.")
 
         # Load annotations
-        annotations = pd.read_csv(annotations_file, index_col=patient_column)
+        annotations = pd.read_csv(self.annotations_file, index_col=self.patient_column)
         annotations.index.name = "patient"
 
         # Renaming the slide column if provided, otherwise just use the patient column as slide identifier
-        if not slide_column:
+        if not self.slide_column:
             annotations["slide"] = annotations.index
         else:
-            annotations.rename(columns={slide_column: "slide"}, inplace=True)
+            annotations.rename(columns={self.slide_column: "slide"}, inplace=True)
         # Rename label column
-        annotations.rename(columns={label_column: "label"}, inplace=True)
+        annotations.rename(columns={self.label_column: "label"}, inplace=True)
 
         labels = annotations["label"].unique()
         # Transform labels to float values
-        if transform_labels:
+        if self.transform_labels:
             label_map = {label: float(i) for i, label in enumerate(labels)}
             annotations["label"] = annotations["label"].map(label_map)
             pretty = ", ".join(f"{k}: {v}" for k, v in label_map.items())
             self.vlog(f"Transformed labels to float values: [{INFO_CLR}]{pretty}[/]")
+            self.label_map = label_map
         else:
-            label_map = annotations["label"].dropna().unique().tolist()
+            self.label_map = annotations["label"].dropna().unique().tolist()
         
         # Save modified annotations
         out_path = self.project_dir / "annotations.csv"
@@ -241,17 +229,9 @@ class Project:
             self.vlog("Warning: annotation file written but is empty.")
 
         self.vlog(f"Annotations saved to [{INFO_CLR}]{out_path}[/]")
+        self.modified_annotations = out_path
 
-        return out_path, label_map
-
-    def _create_project_scaffold(
-        self,
-        annotations_file: Path,
-        patient_column: str,
-        label_column: str,
-        slide_column: str | None,
-        transform_labels: bool
-        ) -> None:
+    def _create_project_scaffold(self) -> None:
         """Create the project directory (if needed) and generate modified
         annotations inside it.
 
@@ -259,13 +239,6 @@ class Project:
             - The project directory exists.
             - Normalized annotations are written to project_dir/annotations.csv.
             - label_map and modified_annotations are stored on the instance.
-
-        Args:
-            annotations_file (Path): Annotations file
-            patient_column (str): column with patient identifiers
-            label_column (str): column with label
-            slide_column (str | None): column with slide identifiers. Optional
-            transform_labels (bool): Whether to tranform labels to floats
 
         Raises:
             ValueError: If existing annotations file in project directory is invalid.
@@ -279,32 +252,12 @@ class Project:
         
         # Default: Checl for existing annotations file in project directory
         if (out_path := self.project_dir / "annotations.csv").exists():
-            if not contains_columns(out_path, self._get_required_columns()):
+            if not contains_columns(out_path, self.required_columns):
                 raise ValueError(f"Existing annotations file in project directory is invalid.")
             self.vlog(f"Using existing annotations file in project directory.")
             self.modified_annotations = out_path
             self.label_map = get_unique_labels(self.modified_annotations, self.label_column)
         # Fallback: create modified annotations file
         else:
-            modified_annotations, label_map = self._setup_annotations(
-                annotations_file,
-                patient_column,
-                label_column,
-                slide_column,
-                transform_labels
-            )
-            self.modified_annotations = modified_annotations
-            self.label_map = label_map
+            self._setup_annotations()
         self.vlog(f"[{SUCCESS_CLR}]Project scaffold setup complete.[/]")
-    
-    def _get_required_columns(self) -> set[str]:
-        """
-        Returns the set of required columns for the annotations file.
-
-        Returns:
-            set[str]: Set of required column names.
-        """
-        required_columns = {self.patient_column, self.label_column}
-        if self.slide_column:
-            required_columns.add(self.slide_column)
-        return required_columns

@@ -16,6 +16,7 @@ from pipeline import (configure_image_backend, create_project_scaffold,
                       setup_dataset, setup_project,
                       train_with_estimate_comparison)
 from project import Project
+from trainer import Trainer
 from utils import RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -35,6 +36,8 @@ def AutoMIL():
 @click.option("-sc", "--slide_column",   type=str, default=None,        help="Name of the column containing slide names")
 @click.option("-r", "--resolutions",     type=str, default="Low,Ultra_Low",
               help=f"Comma-separated list of resolution presets ({','.join(RESOLUTION_PRESETS.__members__.keys())}) to train on")
+@click.option("-m", "--model",           type=click.Choice([model.name for  model in ModelType]), default="Attention_MIL",
+              help="Model type to use")
 @click.option("-k",                      type=int, default=3,           help="number of folds to train per resolution level")
 @click.option("-t", "--transform_labels", is_flag=True,                 help="Transforms labels to float values (0.0, 1.0, ...)")
 @click.option("-s", "--skip_tiling",      is_flag=True,                 help="Skips the tiling step (assumes tiles are already extracted)")
@@ -48,6 +51,7 @@ def run_pipeline(
     label_column:    str,
     slide_column:    str,
     resolutions:     str,
+    model:           str,
     k:               int,
     transform_labels: bool,
     skip_tiling:      bool,
@@ -78,6 +82,15 @@ def run_pipeline(
                 continue
                 
         vlog(f"Using resolution presets: {[preset.name for preset in resolution_presets]}")
+
+        # --- Parse Model Type ---
+        if model in ModelType.__members__:
+            model_type = ModelType[model]
+            vlog(f"Using model type: {model_type.name}")
+        # This should never happen since we use click.Choice but it is here for completeness
+        else:
+            vlog(f"Invalid model type '{model}'. Available models: {[m.name for m in ModelType]}", LogLevel.ERROR)
+            return
 
         # --- 1. Image Backend Configuration ---
         png_slides_present: bool = any(
@@ -144,13 +157,22 @@ def run_pipeline(
                  f"{len(train.slides())} train slides"
             )
 
-            train_with_estimate_comparison(
-                ModelType.Attention_MIL,
+            train, val = train.split(
+                labels="label",
+                val_fraction=0.2
+            )
+
+            trainer = Trainer(
+                Path(project_dir) / "bags",
                 project,
                 train,
+                val,
+                model=model_type,
                 k=k,
-                verbose=verbose,
+                epochs=300
             )
+            trainer.train_k_fold()
+            trainer.summary()
 
         # --- 5. Prediction and Ensemble ---
         evaluate(

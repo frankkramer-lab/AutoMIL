@@ -2,7 +2,7 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Generator, Optional, TypeVar
+from typing import Callable, Generator, Optional, TypeVar
 
 import cv2
 import numpy as np
@@ -11,7 +11,7 @@ import pandas as pd
 import pyvips
 import slideflow as sf
 import torch
-from numpy import ndarray
+import torch.nn as nn
 from PIL import Image
 from slideflow.io import TFRecordWriter, write_tfrecords_multi
 from slideflow.io.torch import serialized_record
@@ -43,6 +43,21 @@ class ModelType(Enum):
     Attention_MIL     = Attention_MIL
     TransMIL          = TransMIL
     BistroTransformer = BistroTransformer
+
+    @property
+    def model_name(self) -> str:
+        """The associated string name to pass to slideflow"""
+        name_mapping = {
+            Attention_MIL: "attention_mil",
+            TransMIL: "transmil", 
+            BistroTransformer: "bistro.transformer"
+        }
+        return name_mapping[self.value]
+    
+    @property
+    def model_class(self):
+        """The associated torch module"""
+        return self.value
 
 # --- Hyperparameters ---
 
@@ -110,6 +125,47 @@ class LogLevel(Enum):
 # ----------------------- #
 # --- Utility methods --- #
 # ----------------------- #
+
+# === Model Instantiation === #
+
+def create_model_instance(
+    model_type: ModelType,
+    input_dim: int,
+    n_out: int = 2
+) -> nn.Module:
+    """Safely create a model instance with the correct parameters.
+    
+    Args:
+        model_type: The ModelType enum
+        input_dim: Input feature dimension
+        n_out: Number of output classes
+        
+    Raise:
+        Exception: If model instantiation fails
+
+    Returns:
+        Instantiated model
+    """
+    try:
+        match model_type:
+
+            case ModelType.Attention_MIL:
+                model_cls = Attention_MIL
+                return model_cls(n_feats=input_dim, n_out=n_out)
+            
+            case ModelType.TransMIL:
+                model_cls = TransMIL
+                return model_cls(n_feats=input_dim, n_out=n_out)
+            
+            case ModelType.BistroTransformer:
+                model_cls = BistroTransformer
+                return model_cls(dim=input_dim)
+
+            case _:
+                return model_cls()
+    except Exception as e:
+        slideflow_log.error(f"Error while creating model instance: {e}")
+        raise e
 
 # --- Logging ---
 

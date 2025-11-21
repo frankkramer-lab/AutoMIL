@@ -4,6 +4,7 @@ Dataset preparation and management for AutoMIL.
 """
 from __future__ import annotations
 
+from functools import cached_property
 from pathlib import Path
 
 import pandas as pd
@@ -45,16 +46,31 @@ class Dataset():
         self.slide_dir = slide_dir
         self.bags_dir  = bags_dir
 
-        self.vlog = get_vlog(verbose)
-        # Getting some resolution (related) parameters
-        self.tile_px = resolution.tile_px
-        self.magnification = resolution.magnification
-        self.mpp = self._compute_mpp(self.magnification, self.slide_dir, by_average=True)
-        self.tile_um = int(self.tile_px * self.mpp)
-
         self.label_map = label_map
         self.pretiled = pretiled
         self.tiff_conversion = tiff_conversion
+
+        self.vlog = get_vlog(verbose)
+
+    @cached_property
+    def tile_px(self) -> int:
+        """Tile size in pixels from resolution preset"""
+        return self.resolution.tile_px
+    
+    @cached_property
+    def magnification(self) -> str:
+        """Magnification from resolution preset"""
+        return self.resolution.magnification
+    
+    @cached_property
+    def mpp(self) -> float:
+        """Computed microns-per-pixel value"""
+        return self._compute_mpp(by_average=True)
+    
+    @cached_property
+    def tile_um(self) -> int:
+        """Tile size in micrometers"""
+        return int(self.tile_px * self.mpp)
 
     def prepare_dataset_source(self) -> sf.Dataset:
         """Prepares a single dataset source for a given resolution preset.
@@ -65,37 +81,28 @@ class Dataset():
             3. Extract tiles (or convert pretiled to tfrecords)
             4. Extract features
 
-        Args:
-            resolution (RESOLUTION_PRESETS): Resolution for which to create dataset source
-            label_map (dict | list[str]): label mapping (usually mapping from original categories to floats
-            slide_dir (Path | None, optional): Optional directory in which to find slides. Defaults to None.
-            pretiled (bool, optional): Whether the input images are already pretiled. If True, tiling is skipped and the input images are directly written to tfrecords. Defaults to False.
-            tiff_conversion (bool, optional): Whether to perform tiff conversion. Recommended if input images are in a format unsuited for tiling (e.g .png). Defaults to False.
-
         Raises:
             ValueError: If `pretiled` is True but no `slide_dir` is provided
 
         Returns:
             sf.Dataset: A slideflow dataset
         """
-        res_name = self.resolution.name
-        tile_px, magnification, tile_um = self.tile_px, self.magnification, self.tile_um
-
-        # Prepare dataset source
-        self.vlog(f"Preparing dataset source at resolution [{INFO_CLR}]{res_name} ({tile_px}px, {tile_um:.2f}um)[/]")
-        dataset = self.project.dataset(tile_px=tile_px, tile_um=tile_um)
+        self.vlog(f"Preparing dataset source at resolution [{INFO_CLR}]{self.resolution.name} "
+                  f"({self.tile_px}px, {self.tile_um:.2f}um)[/]")
+        
+        dataset = self.project.dataset(tile_px=self.tile_px, tile_um=self.tile_um)
         # Filter dataset by with label map
-        dataset = self._apply_label_filter(dataset, self.label_map)
+        dataset = self._apply_label_filter(dataset)
 
         # Convert pretiled to tfrecords
         if self.pretiled:
             if self.slide_dir is None:
                 raise ValueError("slide_dir must be provided when pretiled=True")
-            dataset = self._convert_pretiled(dataset, self.slide_dir)
+            dataset = self._convert_pretiled(dataset)
         else:
-            self._extract_tiles(dataset, magnification, tile_px, self.tiff_conversion, self.mpp)
+            self._extract_tiles(dataset)
 
-        self._extract_features(dataset, self.bags_dir)
+        self._extract_features(dataset)
         return dataset
     
     def summary(self) -> None:
@@ -129,12 +136,7 @@ class Dataset():
         vlog(tabulate(table, tablefmt="fancy_outline"))
 
     # === Internals === #
-    def _compute_mpp(
-        self,
-        magnification: str,
-        slide_dir:  Path | None = None,
-        by_average: bool = False
-        ) -> float:
+    def _compute_mpp(self, by_average: bool = True) -> float:
         """Computes an appropriate Microns Per Pixel (MPP) for the given slide images.
         If `by_average` is True, the average MPP across all slides is computed.
         Otherwise, the first slide's MPP is used.
@@ -150,36 +152,39 @@ class Dataset():
         mpp = None
 
         # Try to compute MPP from slides
-        if slide_dir is not None and slide_dir.exists():
+        if self.slide_dir is not None and self.slide_dir.exists():
             # Average MPP across slides
             if by_average:
-                mpp = calculate_average_mpp(slide_dir)
+                mpp = calculate_average_mpp(self.slide_dir)
                 if mpp is not None:
                     self.vlog(f"[{INFO_CLR}]Computed average MPP across slides: {mpp:.3f}[/]")
             # MPP from first slide
             else:
-                first_slide = next(slide_dir.glob("*"))
+                first_slide = next(self.slide_dir.glob("*"))
                 mpp = get_mpp_from_slide(first_slide)
 
         # Fallback: Default from common mpp values
         if mpp is None:
-            mpp = COMMON_MPP_VALUES.get(magnification, 0.5)
-            self.vlog(f"[{INFO_CLR}]Using default MPP for magnification {magnification}: {mpp:.3f}[/]")
+            mpp = COMMON_MPP_VALUES.get(self.magnification, 0.5)
+            self.vlog(f"[{INFO_CLR}]Using default MPP for magnification {self.magnification}: {mpp:.3f}[/]")
 
         return mpp
     
-    def _apply_label_filter(
-        self,
-        dataset: sf.Dataset,
-        label_map: dict | list[str],
-    ) -> sf.Dataset:
+    def _apply_label_filter(self, dataset: sf.Dataset) -> sf.Dataset:
+        """Apply `label_map` filter to the given dataset
 
+        Args:
+            dataset (sf.Dataset): dataset
+
+        Returns:
+            sf.Dataset: filtered dataset
+        """
         # Extract list of unique labels
-        match label_map:
+        match self.label_map:
             case dict():
-                unique_labels = list(label_map.values())
+                unique_labels = list(self.label_map.values())
             case list():
-                unique_labels = label_map
+                unique_labels = self.label_map
             case _:
                 unique_labels = []
 
@@ -205,16 +210,11 @@ class Dataset():
             filters={"label": unique_labels},
         )
     
-    def _convert_pretiled(
-        self,
-        dataset: sf.Dataset,
-        slide_dir: Path
-    ) -> sf.Dataset:
+    def _convert_pretiled(self, dataset: sf.Dataset) -> sf.Dataset:
         """Converts a pretiled dataset source to tfrecords. Tiling is skipped.
 
         Args:
             dataset (sf.Dataset): pretiled dataset source
-            slide_dir (Path | None, optional): Slide directory. Defaults to None.
 
         Raises:
             RuntimeError: If no project annotations file is found
@@ -223,9 +223,11 @@ class Dataset():
         Returns:
             sf.Dataset: A dataset source with tfrecords
         """
-        ann_file = self.project.annotations
-        if ann_file is None:
+        if not self.project.annotations:
             raise RuntimeError("A project annotations file is required for pretiled datasets.")
+        
+        elif self.slide_dir is None:
+            raise ValueError("slide_dir must be provided when pretiled=True")
 
         # Prepare TFRecords directory
         tf_dir = Path(dataset.tfrecords_folders()[0])
@@ -233,7 +235,7 @@ class Dataset():
 
         self.vlog(f"Converting pretiled slides to tfrecords at {tf_dir}")
 
-        pretiled_to_tfrecords(slide_dir, tf_dir)
+        pretiled_to_tfrecords(self.slide_dir, tf_dir)
 
         dataset.rebuild_index()
         dataset.update_manifest(force_update=True)
@@ -245,14 +247,7 @@ class Dataset():
 
         return dataset
     
-    def _extract_tiles(
-        self,
-        dataset: sf.Dataset,
-        magnification: str,
-        tile_size: int,
-        tiff_conversion: bool,
-        mpp_override: float,
-    ) -> None:
+    def _extract_tiles(self, dataset: sf.Dataset) -> None:
         """Extracts tiles from a given dataset source. Optionally performs tiff prior tiff conversion.
 
         Note:
@@ -261,17 +256,13 @@ class Dataset():
 
         Args:
             dataset (sf.Dataset): Dataset source for which to extract tiles
-            magnification (str): magnification at which to extract tiles
-            tile_size (int): tile_size (in pixels e.g 250) at which to extract tiles
-            tiff_conversion (bool): Whether to perform tiff conversion prior to tiling. Recommenden with .png slides
-            mpp_override (float): Optional value with which to override the Microns-Per-Pixel (MPP) value with which to extract tiles.
 
         Raises:
             RuntimeError: If the batchwise tiff conversion process fails or encounters a timeout.
         """
         # Default Case: Normal tile extraction
-        if not tiff_conversion:
-            self.vlog(f"Extracting tiles at {magnification} | tile={tile_size}")
+        if not self.tiff_conversion:
+            self.vlog(f"Extracting tiles at {self.magnification} | tile={self.tile_px}")
             dataset.extract_tiles(
                 qc=qc.Otsu(),
                 normalizer="reinhard_mask",
@@ -281,7 +272,7 @@ class Dataset():
 
         # Optional: batchwise .tiff conversion
         else:
-            self.vlog(f"Preparing TIFF conversion pipeline ({tile_size}px @ {magnification})")
+            self.vlog(f"Preparing TIFF conversion pipeline ({self.tile_px}px @ {self.magnification})")
 
             # Permanent tiff buffer directory
             tiff_dir = Path(self.project.root) / "tiffs"
@@ -338,28 +329,23 @@ class Dataset():
                     tiff_dataset.extract_tiles(
                         qc=qc.Otsu(),
                         normalizer="reinhard_mask",
-                        mpp_override=mpp_override,
+                        mpp_override=self.mpp
                     )
                 except Exception as e:
                     raise RuntimeError(f"Error extracting tiles for TIFF batch {batch_idx}: {e}")
 
             self.vlog(f"[{SUCCESS_CLR}]Finished TIFF conversion (cached)[/]")
 
-    def _extract_features(
-        self,
-        dataset: sf.Dataset,
-        bags_dir: Path | None = None,
-    ) -> None:
+    def _extract_features(self, dataset: sf.Dataset) -> None:
         """Extracts features from a given (tiled) dataset source and stores them in `bags_dir`
 
         Args:
             dataset (sf.Dataset): Dataset source for which to generate features
-            bags_dir (Path | None, optional): Directory in which to store bags. If `None`, will be set to `project_dir / "bags"`. Defaults to None.
         """
         global FEATURE_EXTRACTOR
 
         # Prepare bags directory
-        bag_dir = Path(self.project.root) / "bags" if bags_dir is None else bags_dir
+        bag_dir = Path(self.project.root) / "bags" if self.bags_dir is None else self.bags_dir
         bag_dir.mkdir(exist_ok=True)
 
         # Build feature extractor model

@@ -7,7 +7,8 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.utils.hooks import RemovableHandle
 
-from utils import MAX_BATCH_SIZE, get_free_memory, reserve_tensor_memory
+from utils import (MAX_BATCH_SIZE, ModelType, create_model_instance,
+                   get_free_memory, reserve_tensor_memory)
 
 
 def estimate_dynamic_vram_usage(
@@ -103,7 +104,7 @@ def measure_vram_usage(model_cls, input_dim=1024, tiles_per_bag=100, batch_size=
     return round(max_mem, 2)
 
 def adjust_batch_size(
-    model_cls: Type[nn.Module],
+    model_type: ModelType,
     initial_batch_size: int,
     num_slides: int,
     input_dim: int,
@@ -124,12 +125,15 @@ def adjust_batch_size(
     global MAX_BATCH_SIZE
     
     # Get estimated memory usage of model and free memory (both in Mb)
-    estimated_mem_usage = estimate_dynamic_vram_usage(
-        model_cls,
-        input_dim,
-        tiles_per_bag,
-        initial_batch_size
-    )
+    estimated_mem_mb, _ = UnifiedSizeEstimator(
+        model=create_model_instance(
+            model_type,
+            input_dim=input_dim,
+            n_out=2
+        ),
+        input_size=(initial_batch_size, tiles_per_bag, input_dim),
+        bits=16
+    ).estimate_size(include_memory_overhead=False)
     free_mem = get_free_memory()
 
     # Adjust batch size according to free memory (with upper bound in mind)
@@ -138,7 +142,7 @@ def adjust_batch_size(
         MAX_BATCH_SIZE
     )
     adjusted_batch_size = min(
-        round(free_mem / estimated_mem_usage) * initial_batch_size, 
+        round(free_mem / estimated_mem_mb) * initial_batch_size, 
         batch_size_limit
     )
 
@@ -488,7 +492,7 @@ class UnifiedSizeEstimator:
 
         return float(total_megabytes), int(total)
     
-def estimate_model_size(model: type[nn.Module], batch_size: int, bag_size: int, input_dim: int, include_memory_overhead: bool = True) -> float:
+def estimate_model_size(model: ModelType, batch_size: int, bag_size: int, input_dim: int, include_memory_overhead: bool = True) -> float:
     """Estimates the size of a MIL pytorch module in MB
 
     Args:
@@ -502,8 +506,12 @@ def estimate_model_size(model: type[nn.Module], batch_size: int, bag_size: int, 
         float: Estimated memory in MB
     """
     estimated_mem_mb, _ = UnifiedSizeEstimator(
-        model=model(n_feats=input_dim, n_out=2),
+        model=create_model_instance(
+            model,
+            input_dim=input_dim,
+            n_out=2
+        ),
         input_size=(batch_size, bag_size, input_dim),
-        bits=16
+        bits=64
     ).estimate_size(include_memory_overhead=False)
     return estimated_mem_mb

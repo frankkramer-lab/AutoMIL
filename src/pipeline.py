@@ -451,7 +451,7 @@ def train(
     tiles_per_bag = 100 # Maybe take average over all bags?
 
     adjusted_batch_size = adjust_batch_size(
-        TransMIL,
+        ModelType.Attention_MIL,
         initial_batch_size,
         num_slides,
         input_dim,
@@ -507,7 +507,7 @@ def train_with_estimate_comparison(
     # Get average number of tiles per bag and number of features per tile
     tiles_per_bag, input_dim = get_bag_avg_and_num_features(bags_path)
     adjusted_batch_size = adjust_batch_size(
-        model_cls,
+        model_type,
         BATCH_SIZE,
         get_num_slides(dataset),
         input_dim,
@@ -515,7 +515,7 @@ def train_with_estimate_comparison(
     )
     vlog(f"Adjusted batch size to [green]{adjusted_batch_size}[/] for model {model_cls.__name__}")
     # Estimate memory
-    estimated_mem_mb = estimate_model_size(Attention_MIL, adjusted_batch_size, tiles_per_bag, input_dim, False)
+    estimated_mem_mb = estimate_model_size(ModelType.Attention_MIL, adjusted_batch_size, tiles_per_bag, input_dim, False)
 
     config = mil_config(
         model="attention_mil",
