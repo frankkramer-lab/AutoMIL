@@ -7,6 +7,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.utils.hooks import RemovableHandle
 
+from model import ModelManager
 from utils import (MAX_BATCH_SIZE, ModelType, create_model_instance,
                    get_free_memory, reserve_tensor_memory)
 
@@ -123,14 +124,15 @@ def adjust_batch_size(
         Batch size adjusted to available memory.
     """
     global MAX_BATCH_SIZE
+
+    model = ModelManager(model_type).create_model(
+        input_dim=input_dim,
+        num_classes=2
+    )
     
     # Get estimated memory usage of model and free memory (both in Mb)
     estimated_mem_mb, _ = UnifiedSizeEstimator(
-        model=create_model_instance(
-            model_type,
-            input_dim=input_dim,
-            n_out=2
-        ),
+        model=model,
         input_size=(initial_batch_size, tiles_per_bag, input_dim),
         bits=16
     ).estimate_size(include_memory_overhead=False)
@@ -492,7 +494,7 @@ class UnifiedSizeEstimator:
 
         return float(total_megabytes), int(total)
     
-def estimate_model_size(model: ModelType, batch_size: int, bag_size: int, input_dim: int, include_memory_overhead: bool = True) -> float:
+def estimate_model_size(model_type: ModelType, batch_size: int, bag_size: int, input_dim: int, include_memory_overhead: bool = True) -> float:
     """Estimates the size of a MIL pytorch module in MB
 
     Args:
@@ -505,13 +507,14 @@ def estimate_model_size(model: ModelType, batch_size: int, bag_size: int, input_
     Returns:
         float: Estimated memory in MB
     """
+    model = ModelManager(model_type).create_model(
+        input_dim=input_dim,
+        num_classes=2
+    )
+
     estimated_mem_mb, _ = UnifiedSizeEstimator(
-        model=create_model_instance(
-            model,
-            input_dim=input_dim,
-            n_out=2
-        ),
+        model=model,
         input_size=(batch_size, bag_size, input_dim),
-        bits=64
+        bits=16
     ).estimate_size(include_memory_overhead=False)
     return estimated_mem_mb
