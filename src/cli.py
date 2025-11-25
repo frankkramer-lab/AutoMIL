@@ -10,7 +10,7 @@ import click
 import slideflow as sf
 
 from dataset import Dataset
-from evaluation import ensemble_predictions, evaluate
+from evaluation import Evaluator
 from Experiments.experiment import BatchSizeExperiment
 from pipeline import (configure_image_backend, create_project_scaffold,
                       setup_dataset, setup_project,
@@ -175,17 +175,21 @@ def run_pipeline(
             trainer.summary()
 
         # --- 5. Prediction and Ensemble ---
-        evaluate(
+        evaluator = Evaluator(
             project,
             original_test,
-            verbose
-        )
-        
-        ensemble_predictions(
+            Path(project.root) / "models",
             Path(project.root) / "ensemble",
-            Path(project.root) / "ensemble_predictions.csv",
-            verbose = verbose
+            Path(project.root) / "bags",
+            verbose=verbose
         )
+
+        evaluator.evaluate_models(generate_attention_heatmaps=True)
+        evaluator.create_ensemble_predictions(
+            output_path=Path(project.root) / "ensemble_predictions.csv"
+        )
+
+        evaluator.compare_models()
     
     except Exception as e:
         tb = traceback.format_exc()

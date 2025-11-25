@@ -8,6 +8,7 @@ from typing import cast
 import pandas as pd
 import slideflow as sf
 import torch
+import torch.nn as nn
 from fastai.callback.core import Callback
 from fastai.callback.tracker import EarlyStoppingCallback
 from fastai.learner import Learner
@@ -238,13 +239,15 @@ class Trainer:
 
         # Measure actual memory usage during inference
         # This can later be compared to the estimated model size
-        model = learner.model
         dummy_input = torch.randn(BATCH_SIZE, self.bag_avg, self.num_features).cuda()
         lens = torch.full((BATCH_SIZE,), self.bag_avg, dtype=torch.int32).cuda()
 
         torch.cuda.reset_peak_memory_stats()
         with torch.no_grad():
-            _ = model(dummy_input, lens)
+            _ = self.model_manager.create_model(
+                input_dim=self.num_features,
+                num_classes=n_out
+                ).to(self.device)
         self.actual_mem_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
         
         self.vlog(f"Training completed: {self.model.model_name}")
