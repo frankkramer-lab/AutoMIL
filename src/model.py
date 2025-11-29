@@ -40,7 +40,7 @@ class ModelManager:
             input_params={"input_dim": "n_feats", "num_classes": "n_out"},
             min_lr=1e-5,
             max_lr=1e-4,
-            max_batch_size=16,
+            max_batch_size=32,
             max_tiles_per_bag=500,
         ),
         ModelType.BistroTransformer: ModelConfig(

@@ -1,4 +1,3 @@
-# dataset.py
 """
 Dataset preparation and management for AutoMIL.
 """

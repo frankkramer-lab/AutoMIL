@@ -4,12 +4,11 @@ from typing import Any, Type
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 from torch.utils.hooks import RemovableHandle
 
 from model import ModelManager
-from utils import (MAX_BATCH_SIZE, ModelType, create_model_instance,
-                   get_free_memory, reserve_tensor_memory)
+from utils import (MAX_BATCH_SIZE, ModelType, get_free_memory,
+                   reserve_tensor_memory)
 
 
 def estimate_dynamic_vram_usage(
@@ -494,7 +493,7 @@ class UnifiedSizeEstimator:
 
         return float(total_megabytes), int(total)
     
-def estimate_model_size(model_type: ModelType, batch_size: int, bag_size: int, input_dim: int, include_memory_overhead: bool = True) -> float:
+def estimate_model_size(model_type: ModelType, batch_size: int, bag_size: int, input_dim: int, num_classes: int, include_memory_overhead: bool = True) -> float:
     """Estimates the size of a MIL pytorch module in MB
 
     Args:
@@ -509,12 +508,12 @@ def estimate_model_size(model_type: ModelType, batch_size: int, bag_size: int, i
     """
     model = ModelManager(model_type).create_model(
         input_dim=input_dim,
-        num_classes=2
+        num_classes=num_classes
     )
 
     estimated_mem_mb, _ = UnifiedSizeEstimator(
         model=model,
         input_size=(batch_size, bag_size, input_dim),
-        bits=16
-    ).estimate_size(include_memory_overhead=False)
+        bits=32
+    ).estimate_size(include_memory_overhead)
     return estimated_mem_mb

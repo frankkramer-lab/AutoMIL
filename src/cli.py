@@ -1,3 +1,4 @@
+import sys
 import traceback
 import warnings
 
@@ -13,13 +14,16 @@ from dataset import Dataset
 from evaluation import Evaluator
 from Experiments.experiment import BatchSizeExperiment
 from pipeline import (configure_image_backend, create_project_scaffold,
-                      setup_dataset, setup_project,
-                      train_with_estimate_comparison)
+                      setup_dataset, setup_project)
 from project import Project
 from trainer import Trainer
 from utils import RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
 
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+CONTEXT_SETTINGS = {
+    "help_option_names": ["-h", "--help"],
+    "max_content_width": 120,
+    "show_default": True,
+}
 
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.version_option(version="1.0.0", prog_name="AutoMIL")
@@ -27,22 +31,41 @@ def AutoMIL():
     """AutoMIL: Automated Multiple Instance Learning for Whole Slide Images."""
     pass
 
-@AutoMIL.command(name="run-pipeline",  context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
+@AutoMIL.command(
+    name="run-pipeline", 
+    context_settings=CONTEXT_SETTINGS,
+    no_args_is_help=True
+)
 @click.argument("slide_dir",        type=click.Path(exists=True, file_okay=False))
 @click.argument("annotation_file",  type=click.Path(exists=True, file_okay=True))
 @click.argument("project_dir",      type=click.Path(file_okay=False))
-@click.option("-pc", "--patient_column", type=str, default="patient",   help="Name of the column containing patient IDs")
-@click.option("-lc", "--label_column",   type=str, default="label",     help="Name of the column containing labels")
-@click.option("-sc", "--slide_column",   type=str, default=None,        help="Name of the column containing slide names")
-@click.option("-r", "--resolutions",     type=str, default="Low,Ultra_Low",
-              help=f"Comma-separated list of resolution presets ({','.join(RESOLUTION_PRESETS.__members__.keys())}) to train on")
-@click.option("-m", "--model",           type=click.Choice([model.name for  model in ModelType]), default="Attention_MIL",
-              help="Model type to use")
-@click.option("-k",                      type=int, default=3,           help="number of folds to train per resolution level")
-@click.option("-t", "--transform_labels", is_flag=True,                 help="Transforms labels to float values (0.0, 1.0, ...)")
-@click.option("-s", "--skip_tiling",      is_flag=True,                 help="Skips the tiling step (assumes tiles are already extracted)")
-@click.option("-v", "--verbose",          is_flag=True,                 help="Enables additional logging messages")
-@click.option("-c", "--cleanup",          is_flag=True,                 help="Deletes the created project structure")
+@click.option(
+    "-pc", "--patient_column", type=str, default="patient",
+    help="Name of the column containing patient IDs"
+)
+@click.option(
+    "-lc", "--label_column", type=str, default="label",
+    help="Name of the column containing labels"
+)
+@click.option(
+    "-sc", "--slide_column", type=str, default=None,
+    help="Name of the column containing slide names"
+)
+@click.option(
+    "-r", "--resolutions", type=(res_choice := click.Choice([res.name for res in RESOLUTION_PRESETS])), default=res_choice.choices[1],
+    help=f"Comma-separated list of resolution presets to train on"
+)
+@click.option(
+    "-m", "--model", type=(model_choice := click.Choice([model.name for  model in ModelType])), default=model_choice.choices[0],
+    help=f"Model type to train and evaluate"
+)
+@click.option(
+    "-k", type=int, default=3,
+    help="number of folds to train per resolution level"
+)
+@click.option("-t", "--transform_labels", is_flag=True, help="Transforms labels to float values (0.0, 1.0, ...)")
+@click.option("-s", "--skip_tiling",      is_flag=True, help="Skips the tiling step (assumes tiles are already extracted)")
+@click.option("-v", "--verbose",          is_flag=True, help="Enables additional logging messages")
 def run_pipeline(
     slide_dir:       str,
     annotation_file: str,
@@ -55,8 +78,7 @@ def run_pipeline(
     k:               int,
     transform_labels: bool,
     skip_tiling:      bool,
-    verbose:          bool,
-    cleanup:          bool
+    verbose:          bool
     ):
     """Executes the full AutoMIL pipeline
     
@@ -66,7 +88,12 @@ def run_pipeline(
     4. Model training
     """
     vlog = get_vlog(verbose)
-    sf.setLoggingLevel(10) # INFO: 20, DEBUG: 10
+    sf.setLoggingLevel(20) # INFO: 20, DEBUG: 10
+
+    # Logging the executed command
+    command = " ".join(sys.argv)
+    vlog(f"Executing command: {command}")
+
     vlog("Starting AutoMIL pipeline...")
     try:
         # --- Parse Resolution Presets ---

@@ -100,6 +100,15 @@ class Trainer:
             setattr(self, suggestion, value)
 
     @cached_property
+    def num_classes(self) -> int:
+        if self.train_dataset.annotations is not None:
+            return self.train_dataset.annotations["label"].nunique()
+        elif self.val_dataset.annotations is not None:
+            return self.val_dataset.annotations["label"].nunique()
+        else:
+            return 2  # Assume binary classification as fallback
+
+    @cached_property
     def num_slides(self) -> int:
         """Number of slides in training and validation dataset"""
         return get_num_slides(self.train_dataset) + get_num_slides(self.val_dataset)
@@ -244,10 +253,7 @@ class Trainer:
 
         torch.cuda.reset_peak_memory_stats()
         with torch.no_grad():
-            _ = self.model_manager.create_model(
-                input_dim=self.num_features,
-                num_classes=n_out
-                ).to(self.device)
+            _ = learner.model(dummy_input, lens)
         self.actual_mem_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
         
         self.vlog(f"Training completed: {self.model.model_name}")
@@ -491,6 +497,7 @@ class Trainer:
             batch_size=self.adjusted_batch_size,
             bag_size=self.bag_avg,
             input_dim=self.num_features,
+            num_classes=self.num_classes
         )
     
     def _build_config(self) -> TrainerConfig:
