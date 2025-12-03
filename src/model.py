@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import torch
 import torch.nn as nn
 from slideflow.mil.models import Attention_MIL, TransMIL
 from slideflow.mil.models.bistro.transformer import \
@@ -46,7 +47,7 @@ class ModelManager:
         ModelType.BistroTransformer: ModelConfig(
             model_cls=BistroTransformer,
             slideflow_model_name="bistro_transformer",
-            input_params={"input_dim": "dim", "num_classes": "num_classes"},
+            input_params={"input_dim": "dim", "num_classes": "heads"},
             min_lr=1e-5,
             max_lr=1e-4,
             max_batch_size=MAX_BATCH_SIZE,
@@ -89,6 +90,36 @@ class ModelManager:
             return self.model_class(**model_params)
         except TypeError as e:
             return self.model_class()
+
+    def create_dummy_input(
+        self, 
+        batch_size: int, 
+        tiles_per_bag: int, 
+        input_dim: int
+    ) -> tuple:
+        """Create appropriate dummy input for the model type
+        
+        Args:
+            batch_size: Number of samples in batch
+            tiles_per_bag: Number of tiles per bag
+            input_dim: Feature dimension
+            
+        Returns:
+            Tuple of tensors to pass to model forward()
+        """
+        match self.model_type:
+
+            case ModelType.Attention_MIL:
+                # Both expect a lens tensor in addition to input
+                dummy_input = torch.randn(batch_size, tiles_per_bag, input_dim).cuda()
+                lens = torch.tensor([tiles_per_bag] * batch_size).cuda()
+                return (dummy_input, lens)
+
+            case ModelType.TransMIL | ModelType.BistroTransformer:
+                # BistroTransformer expects only input (no lens)
+                dummy_input = torch.randn(batch_size, tiles_per_bag, input_dim).cuda()
+                return (dummy_input,)
+            
 
     def validate_hyperparameters(self, lr: float, batch_size: int, max_tiles_per_bag: int) -> dict[str, float | int]:
         """Validates hyperparameters against model constraints

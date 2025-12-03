@@ -12,7 +12,7 @@ import torch.nn as nn
 from fastai.callback.core import Callback
 from fastai.callback.tracker import EarlyStoppingCallback
 from fastai.learner import Learner
-from slideflow.mil import _train_mil, build_fastai_learner, mil_config, utils
+from slideflow.mil import build_fastai_learner, mil_config, utils
 from slideflow.mil._params import TrainerConfig
 from slideflow.mil.eval import generate_attention_heatmaps
 from slideflow.mil.train import _fastai, _log_mil_params
@@ -246,14 +246,16 @@ class Trainer:
         else:
             self.vlog("Unable to generate predictions; skipping metrics and attention export.")
 
-        # Measure actual memory usage during inference
-        # This can later be compared to the estimated model size
-        dummy_input = torch.randn(BATCH_SIZE, self.bag_avg, self.num_features).cuda()
-        lens = torch.full((BATCH_SIZE,), self.bag_avg, dtype=torch.int32).cuda()
+        # Get actual memory usage during inference
+        dummy_input = self.model_manager.create_dummy_input(
+            self.adjusted_batch_size,
+            self.bag_avg,
+            self.num_features
+        )
 
         torch.cuda.reset_peak_memory_stats()
         with torch.no_grad():
-            _ = learner.model(dummy_input, lens)
+            _ = learner.model(*dummy_input)
         self.actual_mem_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
         
         self.vlog(f"Training completed: {self.model.model_name}")

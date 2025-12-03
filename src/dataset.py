@@ -10,6 +10,7 @@ import pandas as pd
 import slideflow as sf
 import torch
 from slideflow.slide import qc
+from slideflow.util import get_slide_paths, path_to_name
 from tabulate import tabulate
 
 from utils import (COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR,
@@ -71,8 +72,19 @@ class Dataset():
         """Tile size in micrometers"""
         return int(self.tile_px * self.mpp)
 
+    @cached_property
+    def tfrecords_dir(self) -> Path:
+        """Path to directory where tfrecords will be stored"""
+        if self.pretiled:
+            return Path(self.project.root) / "tfrecords" / "pretiled"
+        elif self.tiff_conversion:
+            return Path(self.project.root) / "tfrecords" / "tiff_buffer"
+        else:
+            return Path(self.project.root) / "tfrecords"
+
+
     def prepare_dataset_source(self) -> sf.Dataset:
-        """Prepares a single dataset source for a given resolution preset.
+        """Prepares a single dataset source for a given resolution preset, or for a set of pretiled slides.
 
         Performs the following steps:
             1. Compute appropriate MPP for slides
@@ -86,19 +98,24 @@ class Dataset():
         Returns:
             sf.Dataset: A slideflow dataset
         """
+        if self.pretiled:
+            self.vlog(f"Prparing dataset source from pretiled slides at {self.slide_dir}")
         self.vlog(f"Preparing dataset source at resolution [{INFO_CLR}]{self.resolution.name} "
                   f"({self.tile_px}px, {self.tile_um:.2f}um)[/]")
-        
-        dataset = self.project.dataset(tile_px=self.tile_px, tile_um=self.tile_um)
-        # Filter dataset by with label map
-        dataset = self._apply_label_filter(dataset)
 
         # Convert pretiled to tfrecords
         if self.pretiled:
             if self.slide_dir is None:
                 raise ValueError("slide_dir must be provided when pretiled=True")
-            dataset = self._convert_pretiled(dataset)
+            dataset = self._convert_pretiled()
+            dataset = self._apply_label_filter(dataset)
         else:
+            dataset = self.project.dataset(
+                sources="AutoMIL",
+                tile_px=self.tile_px,
+                tile_um=self.tile_um,
+            )
+            dataset = self._apply_label_filter(dataset)
             self._extract_tiles(dataset)
 
         self._extract_features(dataset)
@@ -209,11 +226,8 @@ class Dataset():
             filters={"label": unique_labels},
         )
     
-    def _convert_pretiled(self, dataset: sf.Dataset) -> sf.Dataset:
+    def _convert_pretiled(self) -> sf.Dataset:
         """Converts a pretiled dataset source to tfrecords. Tiling is skipped.
-
-        Args:
-            dataset (sf.Dataset): pretiled dataset source
 
         Raises:
             RuntimeError: If no project annotations file is found
@@ -229,20 +243,36 @@ class Dataset():
             raise ValueError("slide_dir must be provided when pretiled=True")
 
         # Prepare TFRecords directory
-        tf_dir = Path(dataset.tfrecords_folders()[0])
-        tf_dir.mkdir(parents=True, exist_ok=True)
+        tfrecords_dir = self.tfrecords_dir
+        tfrecords_dir.mkdir(parents=True, exist_ok=True)
 
-        self.vlog(f"Converting pretiled slides to tfrecords at {tf_dir}")
+        # Add source if not already present
+        if "pretiled" not in self.project.sources:
+            self.project.add_source(
+                "pretiled",
+                tfrecords=str(tfrecords_dir),
+                slides=str(self.slide_dir)
+            )
+        # Change source so slideflow knows where to look for tfrecords
+        dataset = self.project.dataset(
+            sources=["pretiled"],
+            tile_px=self.tile_px,
+            tile_um=self.tile_um,
+        )
 
-        pretiled_to_tfrecords(self.slide_dir, tf_dir)
+         # Convert pretiled slides to tfrecords
+        self.vlog(f"Converting pretiled slides to tfrecords at {tfrecords_dir} ...")
+
+        pretiled_to_tfrecords(self.slide_dir, Path(dataset.tfrecords_folders()[0]))
 
         dataset.rebuild_index()
         dataset.update_manifest(force_update=True)
-
+        
+        dataset.slide_manifest()
         if len(dataset.manifest()) == 0:
             raise RuntimeError("Pretiled dataset conversion produced an empty manifest.")
 
-        self.vlog(f"{SUCCESS_CLR} Pretiled dataset loaded with {len(dataset.manifest())} slides.")
+        self.vlog(f"Pretiled dataset loaded with {len(dataset.manifest())} slides.")
 
         return dataset
     
@@ -279,15 +309,18 @@ class Dataset():
 
             # Need to register a dataset source for the tiff buffer
             if "tiff_buffer" not in self.project.sources:
-                self.project.add_source("tiff_buffer", slides=str(tiff_dir))
-            tiff_dataset = self.project.dataset(
+                self.project.add_source(
+                    "tiff_buffer",
+                    slides=str(tiff_dir),
+                )
+            dataset = self.project.dataset(
                 sources=["tiff_buffer"],
                 tile_px=dataset.tile_px,
                 tile_um=dataset.tile_um,
             )
 
             # Prepare TFRecords directory
-            tfrecords_dir = Path(tiff_dataset.tfrecords_folders()[0])
+            tfrecords_dir = Path(dataset.tfrecords_folders()[0])
             tfrecords_dir.mkdir(parents=True, exist_ok=True)
 
             # Retieve slide paths and IDs
@@ -325,7 +358,7 @@ class Dataset():
 
                 # Extract tiles
                 try:
-                    tiff_dataset.extract_tiles(
+                    dataset.extract_tiles(
                         qc=qc.Otsu(),
                         normalizer="reinhard_mask",
                         mpp_override=self.mpp

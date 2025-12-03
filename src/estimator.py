@@ -1,4 +1,5 @@
 import inspect
+from functools import cached_property
 from typing import Any, Type
 
 import numpy as np
@@ -123,18 +124,13 @@ def adjust_batch_size(
         Batch size adjusted to available memory.
     """
     global MAX_BATCH_SIZE
-
-    model = ModelManager(model_type).create_model(
-        input_dim=input_dim,
-        num_classes=2
-    )
     
     # Get estimated memory usage of model and free memory (both in Mb)
     estimated_mem_mb, _ = UnifiedSizeEstimator(
-        model=model,
+        model_type=model_type,
         input_size=(initial_batch_size, tiles_per_bag, input_dim),
         bits=16
-    ).estimate_size(include_memory_overhead=False)
+    ).estimate_size(include_memory_overhead=True)
     free_mem = get_free_memory()
 
     # Adjust batch size according to free memory (with upper bound in mind)
@@ -293,9 +289,10 @@ class MILSizeEstimator:
 class UnifiedSizeEstimator:
     def __init__(
         self,
-        model: nn.Module,
+        model_type: ModelType,
         input_size: tuple = (1, 3, 224, 224),  # Default for regular models
         mil_config: dict | None = None,  # Optional MIL configuration
+        num_classes: int = 2,
         bits: int = 32
     ) -> None:
         """Estimates a PyTorch model's size in memory for both regular and Slideflow MIL models.
@@ -314,14 +311,40 @@ class UnifiedSizeEstimator:
                 - feature_dim: Feature dimension per tile
             bits (int, optional): Bits precision. Defaults to 32.
         """
-        self.model: nn.Module = model
+        self.model_type: ModelType = model_type
+        self.model_manager: ModelManager = ModelManager(model_type)
         self.input_size: tuple = input_size
         self.mil_config: dict = mil_config or {}
         self.bits: int = bits
+        self.num_classes: int = num_classes
         self.handles: list[RemovableHandle] = []
-        
+
         # Determine if this is a MIL model
-        self.is_mil_model = self._detect_mil_model()
+        self.is_mil_model = True if self.model_type in {
+            ModelType.Attention_MIL,
+            ModelType.TransMIL,
+            ModelType.BistroTransformer
+        } else False
+    
+    @cached_property
+    def model(self) -> nn.Module:
+        """Instantiates the model using the ModelManager.
+
+        Returns:
+            nn.Module: Instantiated model
+        """
+        if self.is_mil_model:
+            feature_dim = self.mil_config.get('feature_dim', self.input_size[2])
+            return self.model_manager.create_model(
+                input_dim=feature_dim,
+                num_classes=self.num_classes
+            ).cuda()
+        else:
+            feature_dim = self.input_size[2]
+            return self.model_manager.create_model(
+                feature_dim,
+                num_classes=self.num_classes
+            ).cuda()
         
     def _detect_mil_model(self) -> bool:
         """Analyzes the passed model to determine whether it is a Slideflow MIL model or not.
@@ -356,25 +379,20 @@ class UnifiedSizeEstimator:
             tuple: tuple containing the dummy input (Either (input,) or (input, lens))
         """
         if self.is_mil_model:
-            # MIL model input
             batch_size = self.mil_config.get('batch_size', self.input_size[0])
             tiles_per_bag = self.mil_config.get('tiles_per_bag', 100)
             feature_dim = self.mil_config.get('feature_dim', self.input_size[-1])
-            
-            dummy_input = torch.randn(batch_size, tiles_per_bag, feature_dim)
-            
-            # Check if model needs lens parameter
-            import inspect
-            forward_sig = inspect.signature(self.model.forward)
-            if 'lens' in forward_sig.parameters or 'lengths' in forward_sig.parameters:
-                lens = torch.tensor([tiles_per_bag] * batch_size)
-                return (dummy_input, lens)
-            else:
-                return (dummy_input,)
         else:
-            # Regular model input
-            dummy_input = torch.randn(*self.input_size)
-            return (dummy_input,)
+            batch_size = self.input_size[0]
+            tiles_per_bag = self.input_size[1] if len(self.input_size) > 1 else 100
+            feature_dim = self.input_size[2] if len(self.input_size) > 2 else 1024
+            
+        return self.model_manager.create_dummy_input(
+            batch_size=batch_size,
+            tiles_per_bag=tiles_per_bag, 
+            input_dim=feature_dim
+        )
+
     
     def get_parameter_sizes(self) -> list[np.ndarray]:
         """Returns the sizes of all model parameters.
@@ -417,18 +435,10 @@ class UnifiedSizeEstimator:
         
         # Create appropriate dummy input
         dummy_inputs = self._create_dummy_input()
-        
-        # Move to GPU if available
-        if torch.cuda.is_available():
-            self.model = self.model.cuda()
-            dummy_inputs_tuple = tuple(inp.cuda() if isinstance(inp, torch.Tensor) else inp 
-                                       for inp in dummy_inputs)
-        else:
-            dummy_inputs_tuple = dummy_inputs
-        
+
         # Forward pass
         with torch.no_grad():
-            _ = self.model(*dummy_inputs_tuple)
+            _ = self.model(*dummy_inputs)
         
         # Clean up hooks
         for handle in self.handles:
@@ -506,13 +516,8 @@ def estimate_model_size(model_type: ModelType, batch_size: int, bag_size: int, i
     Returns:
         float: Estimated memory in MB
     """
-    model = ModelManager(model_type).create_model(
-        input_dim=input_dim,
-        num_classes=num_classes
-    )
-
     estimated_mem_mb, _ = UnifiedSizeEstimator(
-        model=model,
+        model_type=model_type,
         input_size=(batch_size, bag_size, input_dim),
         bits=32
     ).estimate_size(include_memory_overhead)
