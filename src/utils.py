@@ -126,6 +126,64 @@ class LogLevel(Enum):
 # --- Utility methods --- #
 # ----------------------- #
 
+# === Input Validation === #
+
+def is_input_pretiled(slide_dir: Path, slide_ids: list[str] | None = None) -> bool:
+    """Check if the input slide directory contains pretiled slides.
+
+    `slide_dir` is considered pretiled, if the following conditions are met:
+        1. `slide_dir` contains a subdirectory for each slide (Ideally named after the slide ID)
+        2. Each slide subdirectory contains loose image tiles (.tif, .tiff, .png, .svs)
+    
+    Example structure:
+    ```
+        slide_dir/
+        |-- slide1/
+        |    |-- tile_0_0.png
+        |    |-- tile_0_1.png
+        |    |-- ...
+        |-- slide2/
+        |    |-- tile_0_0.png
+        |    |-- tile_0_1.png
+        |    |-- ...
+    ```
+
+    Args:
+        slide_dir: Path to the slide directory
+        slide_ids: Optional list of expected slide IDs (will check if subdirectory names match these IDs)
+    Returns:
+        True if the slide directory contains pretiled slides, False otherwise.
+    """
+    tile_formats = [".png", ".svs", ".tiff", ".tif"]
+    if not slide_dir.is_dir() or not slide_dir.exists():
+        return False
+    
+    # Collect all subdirectories
+    slide_subdirs = [entry for entry in slide_dir.iterdir() if entry.is_dir()]
+    
+    # Check if there even are subdirectories
+    if not slide_subdirs:
+        return False
+
+    # If slide IDs are provided, check subdirectory names against them
+    if slide_ids:
+        if not all(
+            slide_subdir.name in slide_ids
+            for slide_subdir in slide_subdirs
+        ):
+            return False
+
+    # Check that subdirectories contain loose image files
+    if not all(
+        file.suffix in tile_formats for slide_subdir in slide_subdirs
+        for file in slide_subdir.iterdir() if file.is_file()
+    ):
+        return False
+
+    # If all checks were passed, this is (likely) a pretiled input
+    return True
+
+
 # === Model Instantiation === #
 
 def create_model_instance(

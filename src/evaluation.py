@@ -6,14 +6,13 @@ import pandas as pd
 import slideflow as sf
 from sklearn.metrics import (accuracy_score, average_precision_score,
                              confusion_matrix, f1_score, roc_auc_score)
-from slideflow.mil import eval_mil
+from slideflow.mil import eval_mil, predict_mil
 
 from utils import LogLevel, format_ensemble_summary, get_vlog
 
 
 class Evaluator:
     """loading predictions from .parquet and ensembling and evaluating MIL models"""    
-
 
     def __init__(self,
         project: sf.Project,

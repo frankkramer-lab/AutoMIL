@@ -167,8 +167,6 @@ class Trainer:
         Returns:
             Learner: FastAI Learner object containing the trained model
         """
-        self._debug_dataset_labels()
-
         # Determine output directory
         if model_label_override:
             outdir = self.model_outdir / model_label_override

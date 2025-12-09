@@ -30,7 +30,7 @@ class Dataset():
         label_map: dict | list[str],
         slide_dir: Path | None = None,
         bags_dir:  Path | None = None,
-        pretiled:  bool = False,
+        is_pretiled:  bool = False,
         tiff_conversion: bool = False,
         verbose: bool = True
         ) -> None:
@@ -47,7 +47,7 @@ class Dataset():
         self.bags_dir  = bags_dir
 
         self.label_map = label_map
-        self.pretiled = pretiled
+        self.is_pretiled = is_pretiled
         self.tiff_conversion = tiff_conversion
 
         self.vlog = get_vlog(verbose)
@@ -75,7 +75,7 @@ class Dataset():
     @cached_property
     def tfrecords_dir(self) -> Path:
         """Path to directory where tfrecords will be stored"""
-        if self.pretiled:
+        if self.is_pretiled:
             return Path(self.project.root) / "tfrecords" / "pretiled"
         elif self.tiff_conversion:
             return Path(self.project.root) / "tfrecords" / "tiff_buffer"
@@ -98,13 +98,13 @@ class Dataset():
         Returns:
             sf.Dataset: A slideflow dataset
         """
-        if self.pretiled:
+        if self.is_pretiled:
             self.vlog(f"Prparing dataset source from pretiled slides at {self.slide_dir}")
         self.vlog(f"Preparing dataset source at resolution [{INFO_CLR}]{self.resolution.name} "
                   f"({self.tile_px}px, {self.tile_um:.2f}um)[/]")
 
         # Convert pretiled to tfrecords
-        if self.pretiled:
+        if self.is_pretiled:
             if self.slide_dir is None:
                 raise ValueError("slide_dir must be provided when pretiled=True")
             dataset = self._convert_pretiled()
@@ -145,7 +145,7 @@ class Dataset():
             ("Magnification",     f"{self.magnification}"),
             ("Microns-Per-Pixel", f"{self.mpp:.3f}"),
             ("Tile Size (um)",    f"{self.tile_um:.2f}um"),
-            ("Pretiled Input",    f"{self.pretiled}"),
+            ("Pretiled Input",    f"{self.is_pretiled}"),
             ("TIFF Conversion",   f"{self.tiff_conversion}"),
         ]
         vlog(f"[bold underline]Dataset Summary:[/]")
@@ -216,7 +216,7 @@ class Dataset():
             if ann_type != unique_type:
                 self.vlog(
                     f"Label dtype mismatch ({ann_type} vs {unique_type}). Casting labels.",
-                    level=LogLevel.WARNING,
+                    LogLevel.WARNING,
                 )
                 unique_labels = [ann_type(lbl) for lbl in unique_labels]
 
@@ -335,7 +335,7 @@ class Dataset():
             if not missing:
                 self.vlog(
                     f"All expected tfrecords already exist in {tfrecords_dir}. Skipping TIFF conversion.",
-                    level=LogLevel.WARNING
+                    LogLevel.WARNING
                 )
                 return
 
