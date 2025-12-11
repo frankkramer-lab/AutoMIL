@@ -1,9 +1,17 @@
 import os
+from inspect import signature
 from pathlib import Path
+from typing import cast
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import slideflow as sf
+from matplotlib.axes import Axes
+from matplotlib.container import BarContainer
+from matplotlib.figure import Figure
+from matplotlib.patches import Rectangle
 from sklearn.metrics import (accuracy_score, average_precision_score,
                              confusion_matrix, f1_score, roc_auc_score)
 from slideflow.mil import eval_mil, predict_mil
@@ -350,3 +358,221 @@ class Evaluator:
             self.vlog(comparison_df.to_string(index=False))
         
         return comparison_df
+    
+    # === Plotting === #
+    def generate_plots(
+        self,
+        model_paths: list[Path] | None = None,
+        save_path: Path | None = None,
+        figsize: tuple[int, int] = (10, 10)
+    ) -> None:
+        """Generate all comparison plots and save them to `self.project_dir/figures`"""
+        # Collect models from expected folder if not provided
+        if model_paths is None:
+            model_paths = sorted(
+                [path for path in self.ensemble_dir.iterdir() if path.is_dir()]
+            )
+
+        # Calculate and collect metrics for all models
+        combined_metrics = {}
+        for model_path in model_paths:
+            try:
+                predictions = self.load_predictions(model_path)
+                model_metrics = self.calculate_metrics(predictions)
+                combined_metrics[model_path.name] = model_metrics
+            except Exception as e:
+                self.vlog(f"Failed to load metrics for {model_path.name}: {e}")
+                continue
+        
+        if not combined_metrics:
+            self.vlog("No valid model data found for generating plots")
+            return
+        
+        # Collect and execute all plotting methods
+        plots = cast(
+            dict[str, Figure], # Make sure the type annotation is correct
+            {
+                method_name.removeprefix('_plot_'): plot_method(
+                    combined_metrics,
+                    figsize=figsize,
+                )
+                for method_name in dir(self)
+                if (
+                    method_name.startswith('_plot_')
+                    and callable((plot_method := getattr(self, method_name)))
+                    and signature(plot_method).return_annotation == Figure
+                )
+            }
+        )
+
+        if not save_path:
+            save_path = self.project_path / "figures"
+            save_path.mkdir(parents=True, exist_ok=True)
+
+        # Save all generated plots
+        for plot_name, fig in plots.items():
+            plot_file = save_path / f"{plot_name}.png"
+            fig.savefig(plot_file, dpi=300, bbox_inches='tight')
+            self.vlog(f"Saved plot '{plot_name}' to {plot_file}")
+        return
+
+    def _plot_model_comparison(
+        self,
+        combined_metrics: dict[str, dict[str, float | np.ndarray]],
+        figsize: tuple[int, int] = (12, 8)
+    ) -> Figure:
+        data = pd.DataFrame(combined_metrics)
+        metrics = [col for col in data.index if col != "ConfusionMatrix" and col != "PerClassAccuracy"]
+        n_metrics = len(metrics)
+
+        # Create subplots
+        fig, axes = plt.subplots(1, n_metrics, figsize=figsize, sharey=False)
+        # n_metrics == 1 means only 1 subplot, cast to list for consistency
+        if n_metrics == 1:
+            axes = cast(
+                list[Axes],
+                [axes]
+            )
+        # Otherwise axes is a list of subplots
+        else:
+            axes = cast(
+                list[Axes],
+                axes
+            )
+        
+        colors = plt.cm.get_cmap('Set1')(np.linspace(0, 1, len(data)))
+        x_positions = np.arange(len(data.columns))
+        model_names = list(data.columns)
+        
+        for i, metric in enumerate(metrics):
+            ax = axes[i]
+            # Plot single metric
+            bars = ax.bar(
+                x_positions,
+                data.loc[metric],
+                color=colors,
+                alpha=0.8,
+                edgecolor='black',
+                linewidth=0.5,
+            )
+
+            bar: Rectangle # Iterating over a BarContainer gives Rectangle objects
+            for bar, value in zip(bars, data.loc[metric]):
+                height = bar.get_height()
+                # Place actual value above bar
+                ax.text(
+                    bar.get_x() + bar.get_width()/2., 
+                    height + 0.005,
+                    f'{value:.3f}',
+                    ha='center',
+                    va='bottom',
+                    fontsize=9
+                )
+
+            ax.set_xticks(x_positions)
+            # Set model names as x-tick labels
+            # Since model names can be long, center them to the right
+            # To avoid any offset issues
+            ax.set_xticklabels(
+                model_names,
+                rotation=45,
+                ha="right",
+                rotation_mode="anchor"
+            )
+            
+            ax.set_title(f'{metric}', fontsize=12, fontweight='bold')
+            ax.set_ylabel(metric, fontsize=10)
+            ax.set_ylim(0, 1.1)
+            ax.grid(True, alpha=0.3, axis='y')
+
+        plt.tight_layout()
+        return fig
+
+    def _plot_box_plots(
+        self,
+        combined_metrics: dict[str, dict[str, float | np.ndarray]],
+        figsize: tuple[int, int] = (10, 8)
+    ) -> Figure:
+        # Collect data in long format for box plots
+        plot_data = []
+        for _, metrics in combined_metrics.items():
+            for metric_name, metric_value in metrics.items():
+                if metric_name in ["ConfusionMatrix", "PerClassAccuracy"]:
+                    continue
+                
+                plot_data.append({
+                    'Metric': metric_name,
+                    'Value': float(metric_value)
+                })
+
+        df = pd.DataFrame(plot_data)
+
+        # Create the plot
+        plt.figure(figsize=figsize)
+        
+        sns.boxplot(
+            data=df,
+            x='Metric',
+            y='Value',
+            palette='Set2',
+            width=0.5
+        )
+
+        sns.stripplot(
+            data=df,
+            x='Metric',
+            y='Value',
+            color='black',
+            size=6,
+            jitter=True,
+            alpha=0.7
+        )
+        
+        plt.title('Metric Distributions', fontsize=14, fontweight='bold')
+        plt.ylabel('Value', fontsize=12)
+        plt.xlabel('Metric', fontsize=12)
+        plt.ylim(0, 1.1)
+        plt.grid(True, alpha=0.3, axis='y')
+        
+        plt.tight_layout()
+        return plt.gcf()
+
+    def _plot_per_class_accuracy(
+        self,
+        combined_metrics: dict[str, dict[str, float | np.ndarray]],
+        figsize: tuple[int, int] = (12, 8)
+    ) -> Figure:
+        # Prepare data for plotting
+        data = []
+        for model_name, metrics in combined_metrics.items():
+            per_class_acc = metrics.get("PerClassAccuracy")
+            if isinstance(per_class_acc, np.ndarray):
+                for class_idx, acc in enumerate(per_class_acc):
+                    data.append({
+                        "Model": model_name,
+                        "Class": f"Class {class_idx}",
+                        "Accuracy": acc
+                    })
+        
+        df = pd.DataFrame(data)
+
+        # Create the plot
+        plt.figure(figsize=figsize)
+        
+        # Create a grouped bar plot
+        ax = sns.barplot(data=df, x='Class', y='Accuracy', hue='Model', alpha=0.8)
+        
+        plt.title('Per-Class Accuracy Comparison', fontsize=14, fontweight='bold')
+        plt.ylabel('Accuracy', fontsize=12)
+        plt.xlabel('Class', fontsize=12)
+        plt.ylim(0, 1.1)
+        plt.legend(title='Model', bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.grid(True, alpha=0.3, axis='y')
+        
+        # Add value labels on bars
+        for container in ax.containers:
+            if isinstance(container, BarContainer):
+                ax.bar_label(container, fmt='%.2f', fontsize=9)
+        
+        plt.tight_layout()
+        return plt.gcf()

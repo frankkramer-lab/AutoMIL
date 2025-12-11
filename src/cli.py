@@ -5,6 +5,7 @@ import warnings
 # Suppressing warnings related to pkg_ressources and timm
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
+import json
 from pathlib import Path
 from typing import cast
 
@@ -107,7 +108,7 @@ def run_pipeline(
     \b
     ARGUMENTS:
       SLIDE_DIR        Directory containing whole slide images (.svs, .tiff, etc.)
-      ANNOTATION_FILE  CSV file with slide/patient annotations and labels  
+      ANNOTATION_FILE  .csv file with slide/patient annotations and labels  
       PROJECT_DIR      Output directory for all results and models
     
     \b
@@ -160,7 +161,7 @@ def run_pipeline(
 
     \b
     USING PRETILED DATA:
-      If tiles have already been extracted from the slides, use the `--skip_tiling` flag.
+      If tiles have already been extracted from the slides, use the `--is_pretiled` flag.
       In the case of pretiled data, AutoMIL expects the following directory structure for SLIDE_DIR:
         /data/slides/
         |-- slide1/
@@ -340,6 +341,10 @@ def run_pipeline(
         )
 
         evaluator.compare_models()
+        evaluator.generate_plots(
+            save_path=Path(project.root) / "figures",
+            model_paths=None
+        )
     
     except Exception as e:
         tb = traceback.format_exc()
@@ -460,7 +465,7 @@ def train(
 
     \b
     USING PRETILED DATA:
-      If tiles have already been extracted from the slides, use the `--skip_tiling` flag.
+      If tiles have already been extracted from the slides, use the `--is_pretiled` flag.
       In the case of pretiled data, AutoMIL expects the following directory structure for SLIDE_DIR:
         /data/slides/
         |-- slide1/
@@ -624,7 +629,39 @@ def predict(
     verbose:     bool
 ):
     """
-    Generate predictions using a trained AutoMIL model.
+    Generate predictions using a single or multiple trained MIL models.
+
+    \b
+    `predict` loads all available model checkpoints from MODEL_DIR and generates predictions
+    on the slides in SLIDE_DIR using the corresponding tile features in BAGS_DIR.
+    The results are saved to OUTPUT_FILE.
+
+    \b
+    ARGUMENTS:
+        SLIDE_DIR     Directory containing whole slide images (.svs, .tiff, ...)
+        BAGS_DIR      Directory containing tile feature bags (.pt files)
+        MODEL_DIR     Directory containing trained model checkpoints (.pth files)
+
+    \b
+    EXAMPLES:
+        # Generate predictions with a single model
+        automil predict /data/slides /data/bags /data/models/model_1 ./predictions.parquet
+
+        # Generate predictions with multiple models (generates one output file per model)
+        automil predict /data/slides /data/bags /data/models/ ./predictions.csv -v
+    
+    \b
+    EXPECTED MODEL DIRECTORY STRUCTURE:
+        MODEL_DIR should contain one or more model checkpoint files as .pth files.
+        model checkpoints are recursively collected from MODEL_DIR, so there is no expected
+        directory structure for MODEL_DIR beyond containing .pth files.
+    
+    \b
+    OUTPUT FILE FORMATS:
+        OUTPUT_FILE should be either a .csv or .parquet file.
+        Predictions will be saved in the specified format.
+        If multiple models are used, separate output files will be created for each model,
+        adding a suffix with the model name to the specified OUTPUT_FILE.
     """
     # Getting a verbose logger
     vlog = get_vlog(verbose)
@@ -640,6 +677,7 @@ def predict(
     model_dir = Path(model_dir)
     output_file = Path(output_file)
     
+    # Create a minimal dataset (needed for prediction)
     dataset = sf.Dataset(
         slides=str(slide_dir)
     )
@@ -647,10 +685,33 @@ def predict(
     try:
         model_checkpoints = [checkpoint for checkpoint in model_dir.rglob("*.pt")]
         
-        match (model_num := len(model_checkpoints)):
+        # Single model prediction
+        if (model_num := len(model_checkpoints)) == 1:
+
+            model = model_checkpoints[0]
+            vlog(f"Generating predictions with model: {model.name}")
             
-            case 1:
-                model = model_checkpoints[0]
+            predictions = predict_mil(
+                str(model),
+                dataset,
+                "label",
+                bags=str(bags_dir)
+            )
+            predictions = cast(pd.DataFrame, predictions)
+            
+            match output_file.suffix.lower():
+                case ".csv":
+                    predictions.to_csv(output_file, index=False)
+                case ".parquet":
+                    predictions.to_parquet(output_file, index=False)
+                case _:
+                    vlog(f"Unsupported output file format: {output_file.suffix}. Please use .csv or .parquet", LogLevel.ERROR)
+                    return
+        
+        # Multiple model prediction
+        elif model_num > 1:
+
+            for model in model_checkpoints:
                 vlog(f"Generating predictions with model: {model.name}")
                 
                 predictions = predict_mil(
@@ -663,45 +724,23 @@ def predict(
                 
                 match output_file.suffix.lower():
                     case ".csv":
-                        predictions.to_csv(output_file, index=False)
+                        predictions.to_csv(
+                            output_file.parent / f"{output_file.stem}_{model.stem}.csv",
+                            index=False
+                        )
                     case ".parquet":
-                        predictions.to_parquet(output_file, index=False)
+                        predictions.to_parquet(
+                            output_file.parent / f"{output_file.stem}_{model.stem}.parquet",
+                            index=False
+                        )
                     case _:
                         vlog(f"Unsupported output file format: {output_file.suffix}. Please use .csv or .parquet", LogLevel.ERROR)
                         return
-        
-            case _ if model_num > 1:
-                
-                for model in model_checkpoints:
-                    vlog(f"Generating predictions with model: {model.name}")
-                    
-                    predictions = predict_mil(
-                        str(model),
-                        dataset,
-                        "label",
-                        bags=str(bags_dir)
-                    )
-                    predictions = cast(pd.DataFrame, predictions)
-                    
-                    match output_file.suffix.lower():
-                        case ".csv":
-                            predictions.to_csv(
-                                output_file.parent / f"{output_file.stem}_{model.stem}.csv",
-                                index=False
-                            )
-                        case ".parquet":
-                            predictions.to_parquet(
-                                output_file.parent / f"{output_file.stem}_{model.stem}.parquet",
-                                index=False
-                            )
-                        case _:
-                            vlog(f"Unsupported output file format: {output_file.suffix}. Please use .csv or .parquet", LogLevel.ERROR)
-                            return
             
-            # model_num == 0 | No model checkpoints found
-            case _:
-                vlog(f"No model checkpoints found in directory: {model_dir}", LogLevel.ERROR)
-                return
+        # model_num == 0 | No model checkpoints found
+        else:
+            vlog(f"No model checkpoints found in directory: {model_dir}", LogLevel.ERROR)
+            return
 
     except Exception as e:
         tb = traceback.format_exc()
@@ -727,7 +766,39 @@ def evaluate(
     verbose:     bool
 ):
     """
-    Generate predictions using a trained AutoMIL model.
+    Evaluate a single or multiple trained MIL models.
+
+    \b
+    `evaluate` loads all available model checkpoints from MODEL_DIR, generates predictions
+    on the slides in SLIDE_DIR using the corresponding tile features in BAGS_DIR and evaluates them.
+    The results are saved to OUTPUT_FILE.
+
+    \b
+    ARGUMENTS:
+        SLIDE_DIR     Directory containing whole slide images (.svs, .tiff, ...)
+        BAGS_DIR      Directory containing tile feature bags (.pt files)
+        MODEL_DIR     Directory containing trained model checkpoints (.pth files)
+
+    \b
+    EXAMPLES:
+        # Generate predictions with a single model
+        automil predict /data/slides /data/bags /data/models/model_1 ./predictions.parquet
+
+        # Generate predictions with multiple models (generates one output file per model)
+        automil predict /data/slides /data/bags /data/models/ ./predictions.csv -v
+    
+    \b
+    EXPECTED MODEL DIRECTORY STRUCTURE:
+        MODEL_DIR should contain one or more model checkpoint files as .pth files.
+        model checkpoints are recursively collected from MODEL_DIR, so there is no expected
+        directory structure for MODEL_DIR beyond containing .pth files.
+    
+    \b
+    OUTPUT FILE FORMATS:
+        OUTPUT_FILE should be either a .csv or .parquet file.
+        Predictions will be saved in the specified format.
+        If multiple models are used, separate output files will be created for each model,
+        adding a suffix with the model name to the specified OUTPUT_FILE.
     """
     # Getting a verbose logger
     vlog = get_vlog(verbose)
@@ -743,6 +814,7 @@ def evaluate(
     model_dir = Path(model_dir)
     output_file = Path(output_file)
     
+    # Create a minimal dataset (needed for prediction)
     dataset = sf.Dataset(
         slides=str(slide_dir)
     )
@@ -750,10 +822,33 @@ def evaluate(
     try:
         model_checkpoints = [checkpoint for checkpoint in model_dir.rglob("*.pt")]
         
-        match (model_num := len(model_checkpoints)):
+        # Single model prediction
+        if (model_num := len(model_checkpoints)) == 1:
+
+            model = model_checkpoints[0]
+            vlog(f"Generating predictions with model: {model.name}")
             
-            case 1:
-                model = model_checkpoints[0]
+            predictions = eval_mil(
+                str(model),
+                dataset,
+                "label",
+                bags=str(bags_dir)
+            )
+            predictions = cast(pd.DataFrame, predictions)
+            
+            match output_file.suffix.lower():
+                case ".csv":
+                    predictions.to_csv(output_file, index=False)
+                case ".parquet":
+                    predictions.to_parquet(output_file, index=False)
+                case _:
+                    vlog(f"Unsupported output file format: {output_file.suffix}. Please use .csv or .parquet", LogLevel.ERROR)
+                    return
+        
+        # Multiple model prediction
+        elif model_num > 1:
+
+            for model in model_checkpoints:
                 vlog(f"Generating predictions with model: {model.name}")
                 
                 predictions = eval_mil(
@@ -766,45 +861,23 @@ def evaluate(
                 
                 match output_file.suffix.lower():
                     case ".csv":
-                        predictions.to_csv(output_file, index=False)
+                        predictions.to_csv(
+                            output_file.parent / f"{output_file.stem}_{model.stem}.csv",
+                            index=False
+                        )
                     case ".parquet":
-                        predictions.to_parquet(output_file, index=False)
+                        predictions.to_parquet(
+                            output_file.parent / f"{output_file.stem}_{model.stem}.parquet",
+                            index=False
+                        )
                     case _:
                         vlog(f"Unsupported output file format: {output_file.suffix}. Please use .csv or .parquet", LogLevel.ERROR)
                         return
-        
-            case _ if model_num > 1:
-                
-                for model in model_checkpoints:
-                    vlog(f"Generating predictions with model: {model.name}")
-                    
-                    predictions = eval_mil(
-                        str(model),
-                        dataset,
-                        "label",
-                        bags=str(bags_dir)
-                    )
-                    predictions = cast(pd.DataFrame, predictions)
-                    
-                    match output_file.suffix.lower():
-                        case ".csv":
-                            predictions.to_csv(
-                                output_file.parent / f"{output_file.stem}_{model.stem}.csv",
-                                index=False
-                            )
-                        case ".parquet":
-                            predictions.to_parquet(
-                                output_file.parent / f"{output_file.stem}_{model.stem}.parquet",
-                                index=False
-                            )
-                        case _:
-                            vlog(f"Unsupported output file format: {output_file.suffix}. Please use .csv or .parquet", LogLevel.ERROR)
-                            return
             
-            # model_num == 0 | No model checkpoints found
-            case _:
-                vlog(f"No model checkpoints found in directory: {model_dir}", LogLevel.ERROR)
-                return
+        # model_num == 0 | No model checkpoints found
+        else:
+            vlog(f"No model checkpoints found in directory: {model_dir}", LogLevel.ERROR)
+            return
 
     except Exception as e:
         tb = traceback.format_exc()
@@ -812,9 +885,85 @@ def evaluate(
         vlog(f"Error: {e}", LogLevel.ERROR)
         return
 
+@AutoMIL.command("create-split", context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
+@click.argument("slide_dir",        type=click.Path(exists=True, file_okay=False))
+@click.argument("annotation_file",  type=click.Path(exists=True, file_okay=True))
+@click.option(
+    "-o", "--output-file", type=click.Path(file_okay=True), default="split.json",
+    help="Path to which to save the split .json file"
+)
+@click.option("-f", "--test-fraction", type=float, default=0.2, help="Fraction of slides to include in the test set")
+@click.option("-r", "--read-only", is_flag=True, help="If set, existing split file will not be overwritten")
+@click.option("-v", "--verbose", is_flag=True, help="Enables additional logging messages")
+def create_split(
+    slide_dir:       str | Path,
+    annotation_file: str | Path,
+    output_file:     str | Path,
+    test_fraction:   float,
+    read_only:       bool,
+    verbose:         bool
+):
+    """
+    Create a train-test split .json file based on the provided annotations.
+
+    \b
+    `create-split` reads the annotation file and generates a train-test split,
+    saving it to OUTPUT_FILE in .json format.
+
+    \b
+    ARGUMENTS:
+      SLIDE_DIR        Directory containing whole slide images (.svs, .tiff, etc.)
+      ANNOTATION_FILE  .csv file with slide/patient annotations and labels  
+
+    \b
+    EXAMPLES:
+      # Basic usage with default settings
+      automil create-split /data/slides /data/annotations.csv -o split.json
+
+    \b
+    OUTPUT FILE FORMAT:
+      The output JSON file will have the following structure:
+        {
+          "train": ["slide1", "slide2", ...],
+          "test":  ["slide3", "slide4", ...]
+        }
+    """
+    # Getting a verbose logger
+    vlog = get_vlog(verbose)
+    sf.setLoggingLevel(20) # INFO: 20, DEBUG: 10
+
+    # Logging the executed command
+    command = " ".join(sys.argv)
+    vlog(f"Executing command: {command}")
+
+    # Some type coercion
+    slide_dir = Path(slide_dir)
+    annotation_file = Path(annotation_file)
+    output_file = Path(output_file)
+
+    try:
+        # Minimal dataset for splitting
+        dataset = sf.Dataset(
+            slides=str(slide_dir),
+            annotations=str(annotation_file)
+        )
+        # Create the split and save it
+        _, _ = dataset.split(
+            labels="label",
+            val_fraction=test_fraction,
+            splits=str(output_file),
+            read_only=read_only
+        )
+    
+    except Exception as e:
+        tb = traceback.format_exc()
+        vlog(tb, LogLevel.ERROR)
+        vlog(f"Error: {e}", LogLevel.ERROR)
+        return
 
 if __name__ == '__main__':
     AutoMIL()
+
 
 
 
