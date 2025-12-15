@@ -297,7 +297,7 @@ class Experiment(ABC):
             
             # Estimate memory usage
             estimated_memory, _ = UnifiedSizeEstimator(
-                model=Attention_MIL(n_feats=input_dim, n_out=2),
+                model_type=ModelType.Attention_MIL,
                 input_size=(batch_size, tiles_per_bag, input_dim),
                 bits=32
             ).estimate_size(include_memory_overhead=True)

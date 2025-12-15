@@ -19,31 +19,35 @@ from slideflow.mil import eval_mil, predict_mil
 from utils import LogLevel, format_ensemble_summary, get_vlog
 
 
+# === Helpers === #
+def is_model_directory(path: Path) -> bool:
+    """Check if a given path is a model directory (contains 'predictions.parquet')"""
+    return (path / "predictions.parquet").exists()
+
+
 class Evaluator:
     """loading predictions from .parquet and ensembling and evaluating MIL models"""    
 
     def __init__(self,
-        project: sf.Project,
         dataset: sf.Dataset,
-        model_dir: Path | None = None,
-        ensemble_dir: Path | None = None,
-        bags_dir: Path | None = None,
+        model_dir: Path,
+        out_dir: Path,
+        bags_dir: Path,
         verbose: bool = True
     ) -> None:
-        
-        self.project = project
         self.dataset = dataset
         self.vlog = get_vlog(verbose)
 
         # Path Setup
-        self.project_path = Path(project.root)
-        self.bags_path = bags_dir if bags_dir else self.project_path / "bags"
-        self.model_dir = model_dir if model_dir else self.project_path / "models"
-        self.ensemble_dir = ensemble_dir if ensemble_dir else self.project_path / "ensemble"
-        self.ensemble_dir.mkdir(parents=True, exist_ok=True)
+        self.model_dir = model_dir
+        self.out_dir = out_dir
+        self.bags_dir = bags_dir
 
 
-    def load_predictions(self, model_path: Path) -> pd.DataFrame:
+    def load_predictions(
+        self,
+        model_path: Path
+    ) -> pd.DataFrame:
         """Loads the predictions from a given model path (`model_path/predictions.parquet`) into a Dataframe and validates it by checking for required columns.
 
         Required:
@@ -62,7 +66,6 @@ class Evaluator:
         Returns:
             pd.DataFrame: `model_path/predictions.parquet` loaded into a DataFrame
         """
-
         if not (predictions_path := model_path / "predictions.parquet").exists():
             raise FileNotFoundError(f"{model_path} does not contain a 'predictions.parquet' file")
         
@@ -88,7 +91,7 @@ class Evaluator:
         """Calculate evaluation metrics from predictions DataFrame or path to predictions parquet file.
 
         Args:
-            predictions (pd.DataFrame | Path | str): Predictions DataFrame or path to predictions parquet file
+            predictions (pd.DataFrame | PathIn): Predictions DataFrame or path to predictions parquet file
         Returns:
             dict[str, float | np.ndarray]: Dictionary containing evaluation metrics (AUC, AP, Accuracy, F1, ConfusionMatrix)
         """
@@ -100,9 +103,12 @@ class Evaluator:
             case pd.DataFrame():
                 pass
         
+        # Extract true labels and calculate number of classes
         y_true = predictions["y_true"].astype(int)
         num_classes = len(y_true.unique())
 
+        # We expect columns containing prediction probabilites to start with 'y_pred' (e.g 'y_pred0', 'y_pred1', ...)
+        # Similarly, we may have ensemble predictions ending with '_ensemble' (e.g., 'y_pred0_ensemble', 'y_pred1_ensemble', ...)
         pred_columns = [column for column in predictions.columns if column.startswith("y_pred")]
         # Case 1: Ensemble predictions (priority)
         ensemble_columns = [col for col in pred_columns if col.endswith("_ensemble")]
@@ -173,50 +179,139 @@ class Evaluator:
 
     def evaluate_models(
         self,
+        model_dir: Path | None = None,
+        bags_dir: Path | None = None,
+        out_dir: Path | None = None,
         generate_attention_heatmaps: bool = False
     ) -> None:
-        """Evaluates all models inside `self.model_dir` and writes the results to `self.ensemble_dir`
+        """Evaluates all models inside `self.model_dir` and writes the results to `self.out_dir`
 
         Args:
+            model_dir (Path | None, optional): Directory containing model subdirectories. Defaults to `self.model_dir`.
+            bags_dir (Path | None, optional): Directory containing bags. Defaults to `self.bags_dir`.
+            out_dir (Path | None, optional): Output directory for predictions. Defaults to `self.out_dir`.
             generate_attention_heatmaps (bool, optional): Whether to generate attention heatmaps. Defaults to False.
         """
+        # Default to instance variables if none provided
+        model_dir = model_dir or self.model_dir
+        bags_dir = bags_dir or self.bags_dir
+        out_dir = out_dir or self.out_dir
 
-        model_paths = [subdir for subdir in self.model_dir.iterdir() if subdir.is_dir()]
-
-        if not model_paths:
-            self.vlog(f"No model directories found in {self.model_dir}", LogLevel.WARNING)
-            return
+        # Check if model_dir is a single model directory
+        if is_model_directory(model_dir):
+            model_paths = [model_dir]
+            self.vlog(f"Single model directory detected: {model_dir}")
+        # Else, collect all model subdirectories
+        else:
+            if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
+                self.vlog(f"No model directories found in {model_dir}", LogLevel.WARNING)
+                return
         
+        # Iterate over each model directory and evaluate
         for model_idx, model_path in enumerate(model_paths):
             self.vlog(f"Evaluating model {model_idx+1}/{len(model_paths)}: {model_path}")
-
             try:
                 eval_mil(
                     weights=str(model_path),
-                    bags=str(self.bags_path),
+                    bags=str(bags_dir),
                     dataset=self.dataset,
                     outcomes="label",
-                    outdir=str(self.ensemble_dir),
+                    outdir=str(out_dir),
                     attention_heatmaps=generate_attention_heatmaps
                 )
                 self.vlog("Evaluation complete.\n")
             except Exception as e:
                 self.vlog(f"Error evaluating model at {model_path}: {e}", LogLevel.ERROR)
                 continue
+
+    def generate_predictions(
+        self,
+        model_dir: Path | None = None,
+        bags_dir: Path | None = None,
+        out_dir: Path | None = None
+    ) -> None:
+        """Generates predictions for all models inside `self.model_dir` and writes the results to `self.out_dir`
+
+        Args:
+            model_dir (Path | None, optional): Directory containing model subdirectories. Defaults to `self.model_dir`.
+            bags_dir (Path | None, optional): Directory containing bags. Defaults to `self.bags_dir`.
+            out_dir (Path | None, optional): Output directory for predictions. Defaults to `self.out_dir`.
+        """
+        # Default to instance variables if none provided
+        model_dir = model_dir or self.model_dir
+        bags_dir = bags_dir or self.bags_dir
+        out_dir = out_dir or self.out_dir
+
+        # Check if model_dir is a single model directory
+        if is_model_directory(model_dir):
+            model_paths = [model_dir]
+            self.vlog(f"Single model directory detected: {model_dir}")
+        # Else, collect all model subdirectories
+        else:
+            if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
+                self.vlog(f"No model directories found in {model_dir}", LogLevel.WARNING)
+                return
         
+        # Iterate over each model directory and generate predictions
+        for model_idx, model_path in enumerate(model_paths):
+            self.vlog(f"Generating predictions with model {model_idx+1}/{len(model_paths)}: {model_path}")
+            try:
+                predictions = predict_mil(
+                    model=str(model_path),
+                    bags=str(bags_dir),
+                    dataset=self.dataset,
+                    outcomes="label",
+                )
+                # Cast to DataFrame
+                # Can do this safely since predict_mil always returns a DataFrame if attention==False
+                predictions = pd.DataFrame(predictions)
+
+                # Save predictions to out_dir/model_name/predictions.parquet
+                model_out_dir = out_dir / model_path.name
+                model_out_dir.mkdir(parents=True, exist_ok=True)
+                predictions_path = model_out_dir / "predictions.parquet"
+                predictions.to_parquet(predictions_path, index=False)
+                self.vlog(f"Predictions saved to {predictions_path}")
+
+            except Exception as e:
+                self.vlog(f"Error evaluating model at {model_path}: {e}", LogLevel.ERROR)
+                continue
 
     def create_ensemble_predictions(
         self,
         model_dir: Path | None = None,
-        output_path: Path | None = None
+        output_path: Path | None = None,
+        print_summary: bool = True
     ) -> tuple[pd.DataFrame, dict[str, float | np.ndarray]]:
+        """Generate ensemble predictions from all models inside `model_dir` and saves the results to `output_path`
 
-        if not model_dir:
-            model_dir = self.ensemble_dir
+        Args:
+            model_dir (Path | None, optional): Directory containing model subdirectories. Defaults to `self.model_dir`.
+            output_path (Path | None, optional): Optional output file path to write results to. Supported formats: .csv, .parquet. Defaults to None.
 
-        # Try to load predictions from each model that has been evaluated (should all be in ensemble_dir)
+        Raises:
+            ValueError: If no predictions could be loaded from any model in `model_dir`
+            ValueError: If no prediction columns are found for ensembling
+
+        Returns:
+            tuple[pd.DataFrame, dict[str, float | np.ndarray]]: A tuple of ensemble predictions as a DataFrame and a dictionary of evaluation metrics
+        """
+        model_dir = model_dir or self.model_dir
+        output_path = output_path or (self.out_dir / "ensemble_predictions.parquet")
+
+        # Check if model_dir is a single model directory
+        if is_model_directory(model_dir):
+            model_paths = [model_dir]
+            self.vlog(f"Single model directory detected: {model_dir}")
+        # Else, collect all model subdirectories
+        else:
+            if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
+                self.vlog(f"No model directories found in {model_dir}", LogLevel.WARNING)
+                raise ValueError("No model directories found for ensembling")
+
+        # Try to load predictions from each model that has been evaluated (should all be in model_dir)
         predictions_list: list[pd.DataFrame] = []
-        for model_idx, submodel_dir in enumerate([entry for entry in model_dir.iterdir() if entry.is_dir()]):
+        for model_idx, submodel_dir in enumerate(model_paths):
             try:
                 predictions = self.load_predictions(submodel_dir)
 
@@ -287,31 +382,33 @@ class Evaluator:
 
         # calculate metrics and print summary
         metrics = self.calculate_metrics(merged)
-        summary = format_ensemble_summary(
-            len(predictions_list),
-            metrics["ConfusionMatrix"],  # type: ignore
-            float(metrics["AUC"]),
-            float(metrics["AP"]),
-            float(metrics["Accuracy"]),
-            float(metrics["F1"])
-        )
-        self.vlog(summary)
+
+        # Optional summary
+        if print_summary:
+            summary = format_ensemble_summary(
+                len(predictions_list),
+                metrics["ConfusionMatrix"],  # type: ignore
+                float(metrics["AUC"]),
+                float(metrics["AP"]),
+                float(metrics["Accuracy"]),
+                float(metrics["F1"])
+            )
+            self.vlog(summary)
 
         # Save results
-        if output_path:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            if output_path.suffix == ".csv":
-                merged.to_csv(output_path, index=False)
-            else:
-                merged.to_parquet(output_path, index=False)
-            self.vlog(f"Ensemble predictions saved to {output_path}")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if output_path.suffix == ".csv":
+            merged.to_csv(output_path, index=False)
+        else:
+            merged.to_parquet(output_path, index=False)
+        self.vlog(f"Ensemble predictions saved to {output_path}")
 
         return merged, metrics
 
         
     def compare_models(
         self,
-        model_paths: list[Path] | None = None,
+        model_dir: Path | None = None,
         metrics: list[str] = ["Accuracy", "AUC", "F1"]
     ) -> pd.DataFrame:
         """Compare metrics across multiple models
@@ -323,11 +420,19 @@ class Evaluator:
         Returns:
             DataFrame with model comparison
         """
-        if model_paths is None:
-            model_paths = sorted([p for p in self.ensemble_dir.iterdir() if p.is_dir()])
+        model_dir = model_dir or self.model_dir
         
+        # Check if model_dir is a single model directory
+        if is_model_directory(model_dir):
+            model_paths = [model_dir]
+            self.vlog(f"Single model directory detected: {model_dir}")
+        # Else, collect all model subdirectories
+        else:
+            if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
+                self.vlog(f"No model directories found in {model_dir}", LogLevel.WARNING)
+                raise ValueError("No model directories found for comparison")
+
         comparison_data = []
-        
         for model_path in model_paths:
             try:
                 predictions = self.load_predictions(model_path)
@@ -370,7 +475,7 @@ class Evaluator:
         # Collect models from expected folder if not provided
         if model_paths is None:
             model_paths = sorted(
-                [path for path in self.ensemble_dir.iterdir() if path.is_dir()]
+                [path for path in self.out_dir.iterdir() if path.is_dir()]
             )
 
         # Calculate and collect metrics for all models
@@ -406,7 +511,7 @@ class Evaluator:
         )
 
         if not save_path:
-            save_path = self.project_path / "figures"
+            save_path = self.out_dir / "figures"
             save_path.mkdir(parents=True, exist_ok=True)
 
         # Save all generated plots
@@ -415,6 +520,92 @@ class Evaluator:
             fig.savefig(plot_file, dpi=300, bbox_inches='tight')
             self.vlog(f"Saved plot '{plot_name}' to {plot_file}")
         return
+
+    def _plot_roc_curves(
+        self,
+        combined_metrics: dict[str, dict[str, float | np.ndarray]],
+        figsize: tuple[int, int] = (10, 8)
+    ) -> Figure:
+        """Plot ROC curves for all models"""
+        from sklearn.metrics import auc, roc_curve
+        
+        plt.figure(figsize=figsize)
+        
+        colors = plt.cm.get_cmap('Set1')(np.linspace(0, 1, len(combined_metrics)))
+        
+        for i, (model_name, _) in enumerate(combined_metrics.items()):
+            try:
+                # Load predictions for this model
+                model_path = self.out_dir / model_name
+                predictions = self.load_predictions(model_path)
+                
+                y_true = predictions["y_true"].astype(int)
+                num_classes = len(y_true.unique())
+                
+                # Get prediction probabilities
+                pred_columns = [column for column in predictions.columns if column.startswith("y_pred")]
+                ensemble_columns = [col for col in pred_columns if col.endswith("_ensemble")]
+                
+                if ensemble_columns:
+                    prob_columns = [f"y_pred{i}_ensemble" for i in range(num_classes)]
+                else:
+                    prob_columns = [f"y_pred{i}" for i in range(num_classes)]
+                
+                prob_matrix = predictions[prob_columns].values
+                
+                if num_classes == 2:
+                    # Binary classification - single ROC curve
+                    y_probs = prob_matrix[:, 1]  # Probabilities for positive class
+                    
+                    fpr, tpr, _ = roc_curve(y_true, y_probs)
+                    roc_auc = auc(fpr, tpr)
+                    
+                    plt.plot(
+                        fpr, tpr, 
+                        color=colors[i], 
+                        linewidth=2,
+                        label=f'{model_name} (AUC = {roc_auc:.3f})'
+                    )
+                    
+                else:
+                    # Multiclass - plot ROC curve for each class
+                    for class_idx in range(num_classes):
+                        y_true_binary = (y_true == class_idx).astype(int)
+                        y_probs_class = prob_matrix[:, class_idx]
+                        
+                        # Only plot if we have both classes
+                        if len(y_true_binary.unique()) > 1:
+                            fpr, tpr, _ = roc_curve(y_true_binary, y_probs_class)
+                            roc_auc = auc(fpr, tpr)
+                            
+                            # Use different line styles for different classes
+                            line_style = ['-', '--', '-.', ':'][class_idx % 4]
+                            
+                            plt.plot(
+                                fpr, tpr,
+                                color=colors[i],
+                                linestyle=line_style,
+                                linewidth=2,
+                                label=f'{model_name} Class {class_idx} (AUC = {roc_auc:.3f})'
+                            )
+                            
+            except Exception as e:
+                self.vlog(f"Could not plot ROC curve for {model_name}: {e}", LogLevel.WARNING)
+                continue
+    
+        # Plot diagonal line (random classifier)
+        plt.plot([0, 1], [0, 1], 'k--', linewidth=1, alpha=0.5, label='Random')
+        
+        plt.xlabel('False Positive Rate', fontsize=12)
+        plt.ylabel('True Positive Rate', fontsize=12)
+        plt.title('ROC Curves', fontsize=14, fontweight='bold')
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.grid(True, alpha=0.3)
+        plt.xlim([0, 1])
+        plt.ylim([0, 1])
+        
+        plt.tight_layout()
+        return plt.gcf()
 
     def _plot_model_comparison(
         self,
