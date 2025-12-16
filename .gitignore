@@ -11,8 +11,8 @@ __pycache__
 *.log
 Datasets/*
 batch_size_analysis/*
-src/dataset_transform.py
-src/DatasetTransforms
+automil/dataset_transform.py
+automil/DatasetTransforms
 split.json
 project_*
 model_test/
