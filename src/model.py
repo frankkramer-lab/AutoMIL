@@ -1,3 +1,6 @@
+"""
+Module for ``automil.ModelManager``, which handles model instantiation and hyperparameter adjustments.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -23,7 +26,10 @@ class ModelConfig:
 
 
 class ModelManager:
+    """Manages MIL model imstantiation and adjustment of hyperparameters to model appropriate ranges
+    """
 
+    # Baseline internal model configurations
     _MODEL_CONFIGS: dict[ModelType, ModelConfig] = {
         ModelType.Attention_MIL: ModelConfig(
             model_cls=Attention_MIL,
@@ -56,6 +62,13 @@ class ModelManager:
     }
 
     def __init__(self, model_type: ModelType) -> None:
+        f"""Instantiates a ModelManager object
+
+        Args:
+            model_type (ModelType): Type of model to instantiate. Can be one of: {
+                [model.name for model in ModelType]
+            }
+        """
         self.model_type = model_type
         self.config = self._MODEL_CONFIGS[model_type]
     
@@ -68,7 +81,7 @@ class ModelManager:
         return self.config.model_cls
 
     def create_model(self, input_dim: int = 1024, num_classes: int = 2, **kwargs) -> nn.Module:
-        """Instantiates a model with appropriate parameters
+        """Instantiates a model of `self.model_type` with appropriate parameters
 
         Args:
             input_dim (int, optional): Feature dimensions. Defaults to 1024.
@@ -97,7 +110,7 @@ class ModelManager:
         tiles_per_bag: int, 
         input_dim: int
     ) -> tuple:
-        """Create appropriate dummy input for the model type
+        """Create appropriate dummy input for `self.model_type`
         
         Args:
             batch_size: Number of samples in batch
@@ -148,7 +161,20 @@ class ModelManager:
 
     @classmethod
     def compare_models(cls) -> str:
-        """Generate a comparison table of all models"""
+        """Generates a comparison table for all available models
+        
+        Example:
+            ╔═══════════════════╤════════════════════╤══════════════════╤═════════════════════╤═════════════╗
+            │ Model Type        │ Slideflow Name     │   Max Batch Size │   Max Tiles Per Bag │ LR Range    │
+            ╞═══════════════════╪════════════════════╪══════════════════╪═════════════════════╪═════════════╡
+            │ Attention_MIL     │ attention_mil      │              100 │                1000 │ 1e-05-1e-04 │
+            │ TransMIL          │ transmil           │               32 │                 500 │ 1e-05-1e-04 │
+            │ BistroTransformer │ bistro_transformer │              100 │                1000 │ 1e-05-1e-04 │
+            ╘═══════════════════╧════════════════════╧══════════════════╧═════════════════════╧═════════════╛
+
+        Returns:
+            str: A comparison table as string
+        """
         from tabulate import tabulate
         
         table = []

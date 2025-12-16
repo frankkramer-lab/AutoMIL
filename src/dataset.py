@@ -1,5 +1,5 @@
 """
-Dataset preparation and management for AutoMIL.
+Module for ``automil.Dataset``, which manages dataset sources for the AutoMIL pipeline.
 """
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import pandas as pd
 import slideflow as sf
 import torch
 from slideflow.slide import qc
-from slideflow.util import get_slide_paths, path_to_name
 from tabulate import tabulate
 
 from utils import (COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR,
@@ -21,7 +20,9 @@ from utils import (COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR,
 
 
 class Dataset():
-    """Prepare and manage dataset sources for AutoMIL
+    """Prepares and manages slideflow dataset sources for use in the AutoMIL pipeline.
+
+    Supports both raw slide directories as well as pretiled slide datasets.
     """
     def __init__(
         self,
@@ -34,7 +35,7 @@ class Dataset():
         tiff_conversion: bool = False,
         verbose: bool = True
         ) -> None:
-        """Prepare and manage dataset sources for AutoMIL
+        """Initializes the Dataset manager.
 
         Args:
             project (sf.Project): Project for which to manage dataset sources
@@ -99,7 +100,7 @@ class Dataset():
             sf.Dataset: A slideflow dataset
         """
         if self.is_pretiled:
-            self.vlog(f"Prparing dataset source from pretiled slides at {self.slide_dir}")
+            self.vlog(f"Preparing dataset source from pretiled slides at [{INFO_CLR}]{self.slide_dir}[/]")
         self.vlog(f"Preparing dataset source at resolution [{INFO_CLR}]{self.resolution.name} "
                   f"({self.tile_px}px, {self.tile_um:.2f}um)[/]")
 
@@ -173,7 +174,7 @@ class Dataset():
             if by_average:
                 mpp = calculate_average_mpp(self.slide_dir)
                 if mpp is not None:
-                    self.vlog(f"[{INFO_CLR}]Computed average MPP across slides: {mpp:.3f}[/]")
+                    self.vlog(f"Computed average MPP across slides: [{INFO_CLR}]{mpp:.3f}[/]")
             # MPP from first slide
             else:
                 first_slide = next(self.slide_dir.glob("*"))
@@ -182,7 +183,7 @@ class Dataset():
         # Fallback: Default from common mpp values
         if mpp is None:
             mpp = COMMON_MPP_VALUES.get(self.magnification, 0.5)
-            self.vlog(f"[{INFO_CLR}]Using default MPP for magnification {self.magnification}: {mpp:.3f}[/]")
+            self.vlog(f"Using default MPP for magnification [{INFO_CLR}]{self.magnification}: {mpp:.3f}[/]")
 
         return mpp
     
@@ -214,10 +215,6 @@ class Dataset():
             unique_type = type(unique_labels[0])
 
             if ann_type != unique_type:
-                self.vlog(
-                    f"Label dtype mismatch ({ann_type} vs {unique_type}). Casting labels.",
-                    LogLevel.WARNING,
-                )
                 unique_labels = [ann_type(lbl) for lbl in unique_labels]
 
         return self.project.dataset(
@@ -277,7 +274,7 @@ class Dataset():
         return dataset
     
     def _extract_tiles(self, dataset: sf.Dataset) -> None:
-        """Extracts tiles from a given dataset source. Optionally performs tiff prior tiff conversion.
+        """Extracts tiles from a given dataset source. Optionally performs prior tiff conversion.
 
         Note:
             The tiff conversion process is performed in batches to avoid excessive disk space usage.
@@ -291,7 +288,7 @@ class Dataset():
         """
         # Default Case: Normal tile extraction
         if not self.tiff_conversion:
-            self.vlog(f"Extracting tiles at {self.magnification} | tile={self.tile_px}")
+            self.vlog(f"Extracting tiles at [{INFO_CLR}]{self.magnification} | tile={self.tile_px}[/]")
             dataset.extract_tiles(
                 qc=qc.Otsu(),
                 normalizer="reinhard_mask",
@@ -301,7 +298,7 @@ class Dataset():
 
         # Optional: batchwise .tiff conversion
         else:
-            self.vlog(f"Preparing TIFF conversion pipeline ({self.tile_px}px @ {self.magnification})")
+            self.vlog(f"Preparing TIFF conversion pipeline [{INFO_CLR}]({self.tile_px}px @ {self.magnification})[/]")
 
             # Permanent tiff buffer directory
             tiff_dir = Path(self.project.root) / "tiffs"
@@ -366,7 +363,7 @@ class Dataset():
                 except Exception as e:
                     raise RuntimeError(f"Error extracting tiles for TIFF batch {batch_idx}: {e}")
 
-            self.vlog(f"[{SUCCESS_CLR}]Finished TIFF conversion (cached)[/]")
+            self.vlog(f"[{SUCCESS_CLR}]Finished TIFF conversion[/]")
 
     def _extract_features(self, dataset: sf.Dataset) -> None:
         """Extracts features from a given (tiled) dataset source and stores them in `bags_dir`

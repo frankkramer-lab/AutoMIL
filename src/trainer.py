@@ -1,3 +1,4 @@
+"""Module for ``automil.Trainer``, which handles MIL model training with automatic batch size optimization and early stopping."""
 from __future__ import annotations
 
 from functools import cached_property

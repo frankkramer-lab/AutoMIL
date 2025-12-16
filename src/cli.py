@@ -1,3 +1,4 @@
+"""The entry point CLI for running AutoMIL"""
 import sys
 import traceback
 import warnings
@@ -5,14 +6,10 @@ import warnings
 # Suppressing warnings related to pkg_ressources and timm
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
-import json
 from pathlib import Path
-from typing import cast
 
 import click
-import pandas as pd
 import slideflow as sf
-from slideflow.mil import eval_mil, predict_mil
 
 from dataset import Dataset
 from evaluation import Evaluator
@@ -649,21 +646,31 @@ def predict(
         # Generate predictions with multiple models (generates one output file per model)
         automil predict /data/slides /data/annotations.csv /data/bags /data/models/ -o ./predictions
 
-        # Generate predictions with multiple models (generates one output file per model)
-        automil predict /data/slides /data/annotations.csv /data/bags /data/models/ -v
+        # Generate predictions with a single model
+        automil predict /data/slides /data/annotations.csv /data/bags /data/models/model_1 -v
     
     \b
     EXPECTED MODEL DIRECTORY STRUCTURE:
-        MODEL_DIR should contain one or more model checkpoint files as .pth files.
-        model checkpoints are recursively collected from MODEL_DIR, so there is no expected
-        directory structure for MODEL_DIR beyond containing .pth files.
+        MODEL_DIR can refer to a single model directory (containing one .pth file) or
+        a parent directory containing multiple model subdirectories with .pth files.
+        EXAMPLE STRUCTURE FOR A SINGLE MODEL:
+            /data/models/model_1/
+                |-- best_valid.pth
+                |....
+        EXAMPLE STRUCTURE FOR MULTIPLE MODELS:
+          /data/models/
+            |-- model_1/
+            |    |-- best_valid.pth
+            |-- model_2/
+            |    |-- best_valid.pth
+            |    |...
     
     \b
-    OUTPUT FILE FORMATS:
-        OUTPUT_FILE should be either a .csv or .parquet file.
-        Predictions will be saved in the specified format.
+    OUTPUT DIRECTORY FORMAT:
+        OUTPUT_DIR should be a directory path.
+        Predictions will be saved in separate .csv or .parquet files within this directory.
         If multiple models are used, separate output files will be created for each model,
-        adding a suffix with the model name to the specified OUTPUT_FILE.
+        adding a suffix with the model name to the specified OUTPUT_DIR path.
     """
     # Getting a verbose logger
     vlog = get_vlog(verbose)
@@ -709,7 +716,7 @@ def predict(
 @click.argument("model_dir",    type=click.Path(exists=True, file_okay=False))
 @click.option(
     "-o", "--output-dir", 
-    type=click.Path(file_okay=True), default="results",
+    type=click.Path(file_okay=True), default="evaluation",
     help="Directory to which to save evaluation results"
 )
 @click.option("-v", "--verbose", is_flag=True, help="Enables additional logging messages")
@@ -732,29 +739,40 @@ def evaluate(
     \b
     ARGUMENTS:
         SLIDE_DIR     Directory containing whole slide images (.svs, .tiff, ...)
+        ANNOTATION_FILE  .csv file with slide/patient annotations and labels
         BAGS_DIR      Directory containing tile feature bags (.pt files)
         MODEL_DIR     Directory containing trained model checkpoints (.pth files)
 
     \b
     EXAMPLES:
-        # Generate predictions with a single model
-        automil predict /data/slides /data/bags /data/models/model_1 ./predictions.parquet
+        # Evaluate a single model
+        automil evaluate /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./results
 
         # Generate predictions with multiple models (generates one output file per model)
-        automil predict /data/slides /data/bags /data/models/ ./predictions.csv -v
+        automil evaluate /data/slides /data/annotations.csv /data/bags /data/models/ -v
     
     \b
     EXPECTED MODEL DIRECTORY STRUCTURE:
-        MODEL_DIR should contain one or more model checkpoint files as .pth files.
-        model checkpoints are recursively collected from MODEL_DIR, so there is no expected
-        directory structure for MODEL_DIR beyond containing .pth files.
+        MODEL_DIR can refer to a single model directory (containing one .pth file) or
+        a parent directory containing multiple model subdirectories with .pth files.
+        EXAMPLE STRUCTURE FOR A SINGLE MODEL:
+            /data/models/model_1/
+                |-- best_valid.pth
+                |....
+        EXAMPLE STRUCTURE FOR MULTIPLE MODELS:
+          /data/models/
+            |-- model_1/
+            |    |-- best_valid.pth
+            |-- model_2/
+            |    |-- best_valid.pth
+            |    |...
     
     \b
-    OUTPUT FILE FORMATS:
-        OUTPUT_FILE should be either a .csv or .parquet file.
-        Predictions will be saved in the specified format.
+    OUTPUT DIRECTORY FORMAT:
+        OUTPUT_DIR should be a directory path.
+        Predictions will be saved in separate .csv or .parquet files within this directory.
         If multiple models are used, separate output files will be created for each model,
-        adding a suffix with the model name to the specified OUTPUT_FILE.
+        adding a suffix with the model name to the specified OUTPUT_DIR path.
     """
     # Getting a verbose logger
     vlog = get_vlog(verbose)

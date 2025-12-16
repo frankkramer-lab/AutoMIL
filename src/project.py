@@ -1,3 +1,7 @@
+"""
+Module for ``automil.Project``, which assists with setting up and managing an AutoMIL project.
+"""
+
 from __future__ import annotations
 
 from functools import cached_property
@@ -9,7 +13,7 @@ import slideflow as sf
 from slideflow.util import is_project
 from tabulate import tabulate
 
-from utils import INFO_CLR, SUCCESS_CLR, get_unique_labels, get_vlog
+from utils import INFO_CLR, SUCCESS_CLR, get_vlog
 
 
 # === Helpers === #
@@ -40,7 +44,7 @@ def contains_columns(data: pd.DataFrame | Path, columns: Iterable[str], return_m
 
 class Project:
     """
-    A helper class for creating and managing an AutoMIL Slideflow project instance
+    Assists with setting up and managing a slideflow project instance.
 
     Given a directory for the project, an annotations file, and a slide directory,
     this class sets up the necessary project structure, modifies the annotations file to conform to Slideflow's expected format,
@@ -81,6 +85,7 @@ class Project:
         self.transform_labels = transform_labels
         self.vlog = get_vlog(verbose)
 
+    # === Properties === #
     @cached_property
     def required_columns(self) -> set[str]:
         """Required columns for annotations file"""
@@ -125,7 +130,7 @@ class Project:
         self._setup_project_folder()
         self.modified_annotations = self._setup_annotations()
         self._label_map = self._setup_label_map()
-        self.vlog(f"[{SUCCESS_CLR}]Project scaffold setup complete![/]")
+        self.vlog(f"[{SUCCESS_CLR}]Project scaffold setup complete[/]")
 
     def prepare_project(self) -> sf.Project:
         """

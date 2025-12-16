@@ -1,3 +1,6 @@
+"""
+Module for ``automil.Evaluator``, which evaluates MIL models, calculates metrics, and generates plots.
+"""
 import os
 from inspect import signature
 from pathlib import Path
@@ -21,12 +24,36 @@ from utils import LogLevel, format_ensemble_summary, get_vlog
 
 # === Helpers === #
 def is_model_directory(path: Path) -> bool:
-    """Check if a given path is a model directory (contains 'predictions.parquet')"""
-    return (path / "predictions.parquet").exists()
+    """Check if a given directory `path` contains a (trained) model as stored by slideflow
+    
+    Expected Structure:
+    - path/
+        - models/
+            - best_valid.pth
+        - predictions.parquet
+        - history.csv
+        - mil_params.json
+        - slide_manifest.csv
+        - (various plots)
+        - ...
 
+    Args:
+        path (Path): Path to potential model directory
+
+    Returns:
+        bool: Whether `path` is a model directory
+    """
+    required_files = [
+        path / "models" / "best_valid.pth",
+        path / "predictions.parquet",
+        path / "history.csv",
+        path / "mil_params.json",
+        path / "slide_manifest.csv",
+    ]
+    return all(file.exists() for file in required_files)
 
 class Evaluator:
-    """loading predictions from .parquet and ensembling and evaluating MIL models"""    
+    """Evaluates trained MIL models, calculates metrics, generates plots, and creates ensemble predictions."""    
 
     def __init__(self,
         dataset: sf.Dataset,
@@ -35,6 +62,15 @@ class Evaluator:
         bags_dir: Path,
         verbose: bool = True
     ) -> None:
+        """Initializes a Evaluator Instance
+
+        Args:
+            dataset (sf.Dataset): Slideflow dataset
+            model_dir (Path): Directory in which to store trained models
+            out_dir (Path): Diectory in which to store results such as predictions
+            bags_dir (Path): Directory with feature bags
+            verbose (bool, optional): Whether to print verbose messages. Defaults to True.
+        """
         self.dataset = dataset
         self.vlog = get_vlog(verbose)
 
@@ -405,7 +441,6 @@ class Evaluator:
 
         return merged, metrics
 
-        
     def compare_models(
         self,
         model_dir: Path | None = None,
