@@ -13,7 +13,7 @@ import slideflow as sf
 from slideflow.util import is_project
 from tabulate import tabulate
 
-from utils import INFO_CLR, SUCCESS_CLR, get_vlog
+from .utils import INFO_CLR, SUCCESS_CLR, get_vlog
 
 
 # === Helpers === #

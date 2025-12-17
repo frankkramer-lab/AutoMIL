@@ -12,11 +12,11 @@ import torch
 from slideflow.slide import qc
 from tabulate import tabulate
 
-from utils import (COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR,
-                   RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel,
-                   batch_conversion_concurrent, batch_generator,
-                   calculate_average_mpp, get_mpp_from_slide, get_vlog,
-                   pretiled_to_tfrecords)
+from .utils import (COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR,
+                    RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel,
+                    batch_conversion_concurrent, batch_generator,
+                    calculate_average_mpp, get_mpp_from_slide, get_vlog,
+                    pretiled_to_tfrecords)
 
 
 class Dataset():

@@ -19,7 +19,7 @@ from sklearn.metrics import (accuracy_score, average_precision_score,
                              confusion_matrix, f1_score, roc_auc_score)
 from slideflow.mil import eval_mil, predict_mil
 
-from utils import LogLevel, format_ensemble_summary, get_vlog
+from .utils import LogLevel, format_ensemble_summary, get_vlog
 
 
 # === Helpers === #

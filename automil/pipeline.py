@@ -14,14 +14,14 @@ from slideflow.mil.models import Attention_MIL, TransMIL
 from slideflow.slide import qc
 from slideflow.util import is_project, log
 
-from estimator import adjust_batch_size, estimate_model_size
-from utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, ERROR_CLR,
-                   FEATURE_EXTRACTOR, INFO_CLR, LEARNING_RATE,
-                   RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel, ModelType,
-                   batch_conversion_concurrent, batch_generator,
-                   calculate_average_mpp, get_bag_avg_and_num_features,
-                   get_num_slides, get_unique_labels, get_vlog,
-                   pretiled_to_tfrecords)
+from .estimator import adjust_batch_size, estimate_model_size
+from .utils import (BATCH_SIZE, COMMON_MPP_VALUES, EPOCHS, ERROR_CLR,
+                    FEATURE_EXTRACTOR, INFO_CLR, LEARNING_RATE,
+                    RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel, ModelType,
+                    batch_conversion_concurrent, batch_generator,
+                    calculate_average_mpp, get_bag_avg_and_num_features,
+                    get_num_slides, get_unique_labels, get_vlog,
+                    pretiled_to_tfrecords)
 
 
 def configure_image_backend(verbose: bool = True):

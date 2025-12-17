@@ -16,3 +16,4 @@ automil/DatasetTransforms
 split.json
 project_*
 model_test/
+dist/

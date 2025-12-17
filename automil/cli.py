@@ -11,13 +11,13 @@ from pathlib import Path
 import click
 import slideflow as sf
 
-from dataset import Dataset
-from evaluation import Evaluator
-from pipeline import configure_image_backend
-from project import Project
-from trainer import Trainer
-from utils import (RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog,
-                   is_input_pretiled)
+from .dataset import Dataset
+from .evaluation import Evaluator
+from .pipeline import configure_image_backend
+from .project import Project
+from .trainer import Trainer
+from .utils import (RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog,
+                    is_input_pretiled)
 
 CONTEXT_SETTINGS = {
     "help_option_names": ["-h", "--help"],
@@ -891,8 +891,14 @@ def create_split(
         vlog(f"Error: {e}", LogLevel.ERROR)
         return
 
-if __name__ == '__main__':
+
+def main():
+    """Entry point for the automil package"""
     AutoMIL()
+
+
+if __name__ == '__main__':
+    main()
 
 
 

@@ -7,9 +7,9 @@ import torch
 import torch.nn as nn
 from torch.utils.hooks import RemovableHandle
 
-from model import ModelManager
-from utils import (MAX_BATCH_SIZE, ModelType, get_free_memory, get_vlog,
-                   reserve_tensor_memory)
+from .model import ModelManager
+from .utils import (MAX_BATCH_SIZE, ModelType, get_free_memory,
+                    reserve_tensor_memory)
 
 
 def estimate_dynamic_vram_usage(

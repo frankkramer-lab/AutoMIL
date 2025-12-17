@@ -19,10 +19,10 @@ from slideflow.mil.eval import generate_attention_heatmaps
 from slideflow.mil.train import _fastai, _log_mil_params
 from slideflow.util import path_to_name
 
-from estimator import adjust_batch_size, estimate_model_size
-from model import ModelManager
-from utils import (BATCH_SIZE, EPOCHS, INFO_CLR, LEARNING_RATE, ModelType,
-                   get_bag_avg_and_num_features, get_num_slides, get_vlog)
+from .estimator import adjust_batch_size, estimate_model_size
+from .model import ModelManager
+from .utils import (BATCH_SIZE, EPOCHS, INFO_CLR, LEARNING_RATE, ModelType,
+                    get_bag_avg_and_num_features, get_num_slides, get_vlog)
 
 
 class Trainer:

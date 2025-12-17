@@ -11,7 +11,7 @@ from slideflow.mil.models import Attention_MIL, TransMIL
 from slideflow.mil.models.bistro.transformer import \
     Attention as BistroTransformer
 
-from utils import MAX_BATCH_SIZE, ModelType
+from .utils import MAX_BATCH_SIZE, ModelType
 
 
 @dataclass
