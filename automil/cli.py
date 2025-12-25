@@ -1,4 +1,5 @@
 """The entry point CLI for running AutoMIL"""
+# === External libraries === #
 import sys
 import traceback
 import warnings
@@ -11,6 +12,7 @@ from pathlib import Path
 import click
 import slideflow as sf
 
+# === Internal modules === #
 from .dataset import Dataset
 from .evaluation import Evaluator
 from .pipeline import configure_image_backend
@@ -19,12 +21,14 @@ from .trainer import Trainer
 from .utils import (RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog,
                     is_input_pretiled)
 
+# === Setup === #
 CONTEXT_SETTINGS = {
     "help_option_names": ["-h", "--help"],
     "max_content_width": 120,
     "show_default": True,
 }
 
+# === CLI === #
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.version_option(version="1.0.0", prog_name="AutoMIL")
 def AutoMIL():
@@ -237,6 +241,7 @@ def run_pipeline(
             return
 
         # === 2. Image Backend Configuration === #
+        # TODO | Check if this is necessary or if slideflow handles it automatically
         png_slides_present: bool = any(
             [slide.suffix.lower() == ".png" for slide in Path(slide_dir).iterdir()]
         )
@@ -617,6 +622,18 @@ def train(
     type=click.Path(file_okay=True), default="predictions",
     help="Directory to which to save predictions (should either be .csv or .parquet)"
 )
+@click.option(
+    "-pc", "--patient_column", type=str, default="patient",
+    help="Name of the column containing patient IDs"
+)
+@click.option(
+    "-lc", "--label_column", type=str, default="label",
+    help="Name of the column containing labels"
+)
+@click.option(
+    "-sc", "--slide_column", type=str, default=None,
+    help="Name of the column containing slide names"
+)
 @click.option("-v", "--verbose", is_flag=True, help="Enables additional logging messages")
 def predict(
     slide_dir:   str | Path,
@@ -624,6 +641,9 @@ def predict(
     bags_dir:    str | Path,
     model_dir:   str | Path,
     output_dir: str | Path,
+    patient_column:  str,
+    label_column:    str,
+    slide_column:    str | None,
     verbose:     bool
 ):
     """
@@ -685,6 +705,20 @@ def predict(
     bags_dir =  Path(bags_dir)
     model_dir = Path(model_dir)
     output_dir = Path(output_dir)
+
+    # Setup output folder as project (modifies annotation file)
+    project = Project(
+        Path(output_dir),
+        Path(annotation_file),
+        Path(slide_dir),
+        patient_column,
+        label_column,
+        slide_column,
+        transform_labels=False,
+        verbose=verbose,
+    )
+    project.setup_project_scaffold()
+    annotation_file = project.modified_annotations_file
     
     # Create a minimal dataset (needed for prediction)
     dataset = sf.Dataset(
@@ -719,6 +753,18 @@ def predict(
     type=click.Path(file_okay=True), default="evaluation",
     help="Directory to which to save evaluation results"
 )
+@click.option(
+    "-pc", "--patient_column", type=str, default="patient",
+    help="Name of the column containing patient IDs"
+)
+@click.option(
+    "-lc", "--label_column", type=str, default="label",
+    help="Name of the column containing labels"
+)
+@click.option(
+    "-sc", "--slide_column", type=str, default=None,
+    help="Name of the column containing slide names"
+)
 @click.option("-v", "--verbose", is_flag=True, help="Enables additional logging messages")
 def evaluate(
     slide_dir:   str | Path,
@@ -726,6 +772,9 @@ def evaluate(
     bags_dir:    str | Path,
     model_dir:   str | Path,
     output_dir: str | Path,
+    patient_column:  str,
+    label_column:    str,
+    slide_column:    str | None,
     verbose:     bool
 ):
     """
@@ -789,6 +838,20 @@ def evaluate(
     output_dir = Path(output_dir)
 
     vlog(f"Evaluating models in: {model_dir}")
+
+    # Setup output folder as project (modifies annotation file)
+    project = Project(
+        Path(output_dir),
+        Path(annotation_file),
+        Path(slide_dir),
+        patient_column,
+        label_column,
+        slide_column,
+        transform_labels=False,
+        verbose=verbose,
+    )
+    project.setup_project_scaffold()
+    annotation_file = project.modified_annotations_file
     
     # Create a minimal dataset (needed for prediction)
     dataset = sf.Dataset(

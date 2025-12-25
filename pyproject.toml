@@ -34,7 +34,6 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/jonas/AutoMIL"
-"Source" = "https://github.com/jonas/AutoMIL"
 
 [project.scripts]
 automil = "automil.cli:main"
