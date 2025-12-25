@@ -663,11 +663,14 @@ def predict(
 
     \b
     EXAMPLES:
-        # Generate predictions with multiple models (generates one output file per model)
-        automil predict /data/slides /data/annotations.csv /data/bags /data/models/ -o ./predictions
+      # Generate predictions with multiple models (generates one output file per model)
+      automil predict /data/slides /data/annotations.csv /data/bags /data/models/ -o ./predictions
 
-        # Generate predictions with a single model
-        automil predict /data/slides /data/annotations.csv /data/bags /data/models/model_1 -v
+      # Generate predictions with a single model
+      automil predict /data/slides /data/annotations.csv /data/bags /data/models/model_1 -v
+    
+      # Generate predictions with a single model (override column names)
+      automil predict -pc "patient_id" -lc "outcome" -sc "slide_id" /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./predictions
     
     \b
     EXPECTED MODEL DIRECTORY STRUCTURE:
@@ -684,6 +687,23 @@ def predict(
             |-- model_2/
             |    |-- best_valid.pth
             |    |...
+    
+    \b
+    ANNOTATION REQUIREMENTS:
+      ANNOTATION_FILE must be a CSV file containing at least the following columns:
+        - Patient IDs (default column name: "patient")
+        - Slide names (default column name: "slide"; optional)
+        - Labels (default column name: "label")
+      By default, AutoMIL looks for columns named "patient", "slide", and "label".
+      By using the options `--patient_column`, `--slide_column`, and `--label_column`,
+      users can specify custom column names as needed (see EXAMPLES)
+    \b
+    MINIMAL ANNOTATION FILE EXAMPLE:
+        patient,slide,label
+        001,001_1,0
+        001,001_2,0
+        002,002,1
+        003,003,1
     
     \b
     OUTPUT DIRECTORY FORMAT:
@@ -794,11 +814,14 @@ def evaluate(
 
     \b
     EXAMPLES:
-        # Evaluate a single model
-        automil evaluate /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./results
+      # Evaluate a single model
+      automil evaluate /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./results
 
-        # Generate predictions with multiple models (generates one output file per model)
-        automil evaluate /data/slides /data/annotations.csv /data/bags /data/models/ -v
+      # Evaluate multiple models (generates one output file per model)
+      automil evaluate /data/slides /data/annotations.csv /data/bags /data/models/ -v
+    
+      # Evaluate a single model (override column names)
+      automil evaluate -pc "patient_id" -lc "outcome" -sc "slide_id" /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./results      
     
     \b
     EXPECTED MODEL DIRECTORY STRUCTURE:
@@ -816,6 +839,23 @@ def evaluate(
             |    |-- best_valid.pth
             |    |...
     
+    \b
+    ANNOTATION REQUIREMENTS:
+      ANNOTATION_FILE must be a CSV file containing at least the following columns:
+        - Patient IDs (default column name: "patient")
+        - Slide names (default column name: "slide"; optional)
+        - Labels (default column name: "label")
+      By default, AutoMIL looks for columns named "patient", "slide", and "label".
+      By using the options `--patient_column`, `--slide_column`, and `--label_column`,
+      users can specify custom column names as needed (see EXAMPLES)
+    \b
+    MINIMAL ANNOTATION FILE EXAMPLE:
+        patient,slide,label
+        001,001_1,0
+        001,001_2,0
+        002,002,1
+        003,003,1
+
     \b
     OUTPUT DIRECTORY FORMAT:
         OUTPUT_DIR should be a directory path.
