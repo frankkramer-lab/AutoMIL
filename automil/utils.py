@@ -1,4 +1,7 @@
+import os
+import platform
 import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum
 from pathlib import Path
@@ -125,6 +128,33 @@ class LogLevel(Enum):
 # ----------------------- #
 # --- Utility methods --- #
 # ----------------------- #
+
+# === Image Backend Configuration === #
+#  
+def configure_image_backend(verbose: bool = True):
+    """Selects the image backend based on the systems operating system
+
+    During tiling, cucim and openslide create new processes/threads through 'forking'. \\
+    'fork' is an unsupported system call on windows, thus we use libvips. \\
+    
+    **NOTE**: Make sure libvips is installed and in your PATH if you're using windows. \\
+    **NOTE**: This method terminates the current script upon encountering a invalid OS.
+    
+    Args:
+        verbose (bool, optional): Whether to log info messages. Defaults to True.
+    """
+    vlog = get_vlog(verbose)
+    system = platform.system().lower()
+
+    if system == "windows":
+        vlog(f"Using [{INFO_CLR}]libvips[/] backend on Windows")
+        os.environ["SF_SLIDE_BACKEND"] = "libvips"
+    elif system == "linux":
+        vlog(f"Using [{INFO_CLR}]cucim[/] backend on Linux")
+        os.environ["SF_SLIDE_BACKEND"] = "cucim"
+    else:
+        vlog(f"Unsupported OS: [{ERROR_CLR}]{system}[/]", LogLevel.ERROR)
+        sys.exit(1)
 
 # === Input Validation === #
 

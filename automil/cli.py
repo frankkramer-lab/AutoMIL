@@ -15,11 +15,11 @@ import slideflow as sf
 # === Internal modules === #
 from .dataset import Dataset
 from .evaluation import Evaluator
-from .pipeline import configure_image_backend
 from .project import Project
 from .trainer import Trainer
 from .utils import (HIGHLIGHT_CLR, INFO_CLR, RESOLUTION_PRESETS, SUCCESS_CLR,
-                    LogLevel, ModelType, get_vlog, is_input_pretiled)
+                    LogLevel, ModelType, configure_image_backend, get_vlog,
+                    is_input_pretiled)
 
 # === Setup === #
 CONTEXT_SETTINGS = {
