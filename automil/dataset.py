@@ -258,7 +258,7 @@ class Dataset():
         )
 
          # Convert pretiled slides to tfrecords
-        self.vlog(f"Converting pretiled slides to tfrecords at {tfrecords_dir} ...")
+        self.vlog(f"Converting pretiled slides to tfrecords at [{INFO_CLR}]{tfrecords_dir}[/] ...")
 
         pretiled_to_tfrecords(self.slide_dir, Path(dataset.tfrecords_folders()[0]))
 
@@ -269,7 +269,7 @@ class Dataset():
         if len(dataset.manifest()) == 0:
             raise RuntimeError("Pretiled dataset conversion produced an empty manifest.")
 
-        self.vlog(f"Pretiled dataset loaded with {len(dataset.manifest())} slides.")
+        self.vlog(f"Pretiled dataset loaded with [{INFO_CLR}]{len(dataset.manifest())}[/] slides.")
 
         return dataset
     
@@ -349,7 +349,7 @@ class Dataset():
 
             # Process missing/outdated slides in batches
             for batch_idx, slide_batch in enumerate(batch_generator(missing_slides, buffer_size)):
-                self.vlog(f"Converting TIFF batch {batch_idx+1} / {len(missing_slides)//buffer_size+1}")
+                self.vlog(f"Converting TIFF batch [{INFO_CLR}]{batch_idx+1}[/] / [{INFO_CLR}]{len(missing_slides)//buffer_size+1}[/]")
                 # Batchwise conversion to tiff
                 batch_conversion_concurrent(slide_batch, tiff_dir)
 
@@ -383,7 +383,7 @@ class Dataset():
             resize=224,
         )
         num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
-        self.vlog(f"Extracting features using {num_gpus} GPUs …")
+        self.vlog(f"Extracting features using [{INFO_CLR}]{num_gpus}[/] GPUs …")
 
         # Generate feature bags
         dataset.generate_feature_bags(
@@ -393,4 +393,4 @@ class Dataset():
             num_gpus=num_gpus,
         )
 
-        self.vlog(f"{SUCCESS_CLR} Finished feature extraction.")
+        self.vlog(f"[{SUCCESS_CLR}]Finished feature extraction.[/]")

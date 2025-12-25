@@ -18,8 +18,8 @@ from .evaluation import Evaluator
 from .pipeline import configure_image_backend
 from .project import Project
 from .trainer import Trainer
-from .utils import (RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog,
-                    is_input_pretiled)
+from .utils import (HIGHLIGHT_CLR, INFO_CLR, RESOLUTION_PRESETS, SUCCESS_CLR,
+                    LogLevel, ModelType, get_vlog, is_input_pretiled)
 
 # === Setup === #
 CONTEXT_SETTINGS = {
@@ -204,7 +204,7 @@ def run_pipeline(
 
     # Logging the executed command
     command = " ".join(sys.argv)
-    vlog(f"Executing command: {command}")
+    vlog(f"Executing command: [{INFO_CLR}]{command}[/]")
 
     # Define some paths
     bags_dir = Path(project_dir) / "bags"
@@ -221,24 +221,12 @@ def run_pipeline(
         # === 1. Parsing === #
         # Parse given string resolutions into list of RESOLUTION_PRESETS
         resolution_presets: list[RESOLUTION_PRESETS] = []
-
-        for res in [r.strip() for r in resolutions.split(',')]:
-            if res not in RESOLUTION_PRESETS.__members__:
-                vlog(f"Invalid resolution preset '{res}'. Available presets: {[preset.name for preset in RESOLUTION_PRESETS]}", LogLevel.ERROR)
-                return
-            else:
-                resolution_presets.append(RESOLUTION_PRESETS[res])
-        
-        vlog(f"Using resolution presets: {[preset.name for preset in resolution_presets]}")
+        for res in [r.strip() for r in resolutions.split(',')]: resolution_presets.append(RESOLUTION_PRESETS[res])
+        vlog(f"Using resolution presets: [{INFO_CLR}]{[preset.name for preset in resolution_presets]}[/]")
 
         # Parse the model type
-        if model in ModelType.__members__:
-            model_type = ModelType[model]
-            vlog(f"Using model type: {model_type.name}")
-        # This should never happen since we use click.Choice but it is here for completeness
-        else:
-            vlog(f"Invalid model type '{model}'. Available models: {[m.name for m in ModelType]}", LogLevel.ERROR)
-            return
+        model_type = ModelType[model]
+        vlog(f"Using model type: [{INFO_CLR}]{model_type.name}[/]")
 
         # === 2. Image Backend Configuration === #
         # TODO | Check if this is necessary or if slideflow handles it automatically
@@ -280,7 +268,7 @@ def run_pipeline(
 
         datasets: dict[str, sf.Dataset] = {}
         for preset in resolution_presets:
-            vlog(f"Setting up dataset for resolution preset: {preset.name}")
+            vlog(f"Setting up dataset for resolution preset: [{INFO_CLR}]{preset.name}[/]")
 
             dataset = Dataset(
                 project,
@@ -294,7 +282,7 @@ def run_pipeline(
             )
             dataset.summary()
             datasets[preset.name] = dataset.prepare_dataset_source()
-            vlog(f"Dataset setup complete for resolution preset: {preset.name}")
+            vlog(f"Dataset setup complete for resolution preset: [{INFO_CLR}]{preset.name}[/]")
 
         # === 5. Prepare (or Load) Train/Test Split === #
         dataset = datasets[resolution_presets[0].name]
@@ -306,8 +294,8 @@ def run_pipeline(
         
         # === 6. Model Training === #
         for resolution in resolution_presets:
-            vlog(f"Train/Test split for resolution preset '{resolution.name}': "
-                 f"{len(train.slides())} train slides"
+            vlog(f"Train/Test split for resolution preset [{INFO_CLR}]{resolution.name}[/]: "
+                 f"[{INFO_CLR}]{len(train.slides())}[/] train slides"
             )
 
             train, val = train.split(
@@ -494,7 +482,7 @@ def train(
 
     # Logging the executed command
     command = " ".join(sys.argv)
-    vlog(f"Executing command: {command}")
+    vlog(f"Executing command: [{INFO_CLR}]{command}[/]")
 
     # Define some paths
     bags_dir = Path(project_dir) / "bags"
@@ -509,26 +497,15 @@ def train(
         # === 1. Parsing === #
         # Parse given string resolutions into list of RESOLUTION_PRESETS
         resolution_presets: list[RESOLUTION_PRESETS] = []
-
-        for res in [r.strip() for r in resolutions.split(',')]:
-            if res not in RESOLUTION_PRESETS.__members__:
-                vlog(f"Invalid resolution preset '{res}'. Available presets: {[preset.name for preset in RESOLUTION_PRESETS]}", LogLevel.ERROR)
-                return
-            else:
-                resolution_presets.append(RESOLUTION_PRESETS[res])
-        
-        vlog(f"Using resolution presets: {[preset.name for preset in resolution_presets]}")
+        for res in [r.strip() for r in resolutions.split(',')]: resolution_presets.append(RESOLUTION_PRESETS[res])
+        vlog(f"Using resolution presets: [{INFO_CLR}]{[preset.name for preset in resolution_presets]}[/]")
 
         # Parse the model type
-        if model in ModelType.__members__:
-            model_type = ModelType[model]
-            vlog(f"Using model type: {model_type.name}")
-        # This should never happen since we use click.Choice but it is here for completeness
-        else:
-            vlog(f"Invalid model type '{model}'. Available models: {[m.name for m in ModelType]}", LogLevel.ERROR)
-            return
+        model_type = ModelType[model]
+        vlog(f"Using model type: [{INFO_CLR}]{model_type.name}[/]")
 
         # === 2. Image Backend Configuration === #
+        # TODO | Check if this is necessary or if slideflow handles it automatically
         png_slides_present: bool = any(
             [slide.suffix.lower() == ".png" for slide in Path(slide_dir).iterdir()]
         )
@@ -566,7 +543,7 @@ def train(
 
         datasets: dict[str, sf.Dataset] = {}
         for resolution in resolution_presets:
-            vlog(f"Setting up dataset for resolution preset: {resolution.name}")
+            vlog(f"Setting up dataset for resolution preset: [{INFO_CLR}]{resolution.name}[/]")
 
             dataset = Dataset(
                 project,
@@ -580,13 +557,13 @@ def train(
             )
             dataset.summary()
             datasets[resolution.name] = dataset.prepare_dataset_source()
-            vlog(f"Dataset setup complete for resolution preset: {resolution.name}")
+            vlog(f"Dataset setup complete for resolution preset: [{INFO_CLR}]{resolution.name}[/]")
         
         # === 5. Model Training === #
         for resolution in resolution_presets:
             dataset = datasets[resolution.name]
-            vlog(f"Train/Test split for resolution preset '{resolution.name}': "
-                 f"{len(dataset.slides())} train slides"
+            vlog(f"Train/Test split for resolution preset '[{INFO_CLR}]{resolution.name}[/]': "
+                 f"[{INFO_CLR}]{len(dataset.slides())}[/] train slides"
             )
 
             train, val = dataset.split(
@@ -718,7 +695,7 @@ def predict(
 
     # Logging the executed command
     command = " ".join(sys.argv)
-    vlog(f"Executing command: {command}")
+    vlog(f"Executing command: [{INFO_CLR}]{command}[/]")
 
     # Some type coercion
     slide_dir = Path(slide_dir)
@@ -869,7 +846,7 @@ def evaluate(
 
     # Logging the executed command
     command = " ".join(sys.argv)
-    vlog(f"Executing command: {command}")
+    vlog(f"Executing command: [{INFO_CLR}]{command}[/]")
 
     # Some type coercion
     slide_dir =  Path(slide_dir)
@@ -877,7 +854,7 @@ def evaluate(
     model_dir =  Path(model_dir)
     output_dir = Path(output_dir)
 
-    vlog(f"Evaluating models in: {model_dir}")
+    vlog(f"Evaluating models in: [{INFO_CLR}]{model_dir}[/]")
 
     # Setup output folder as project (modifies annotation file)
     project = Project(
@@ -967,7 +944,7 @@ def create_split(
 
     # Logging the executed command
     command = " ".join(sys.argv)
-    vlog(f"Executing command: {command}")
+    vlog(f"Executing command: [{INFO_CLR}]{command}[/]")
 
     # Some type coercion
     slide_dir = Path(slide_dir)

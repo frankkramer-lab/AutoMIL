@@ -150,10 +150,10 @@ class Project:
 
         # Load or create project
         if is_project(str(self.project_dir)):
-            self.vlog(f"Loading existing project at {self.project_dir}")
+            self.vlog(f"Loading existing project at [{INFO_CLR}]{self.project_dir}[/]")
             self.project = sf.load_project(str(self.project_dir))
         else:
-            self.vlog(f"Creating new project at {self.project_dir}")
+            self.vlog(f"Creating new project at [{INFO_CLR}]{self.project_dir}[/]")
             self.project = sf.create_project(
                 name="AutoMIL",
                 root=str(self.project_dir),

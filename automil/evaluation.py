@@ -19,7 +19,7 @@ from sklearn.metrics import (accuracy_score, average_precision_score,
                              confusion_matrix, f1_score, roc_auc_score)
 from slideflow.mil import eval_mil, predict_mil
 
-from .utils import LogLevel, format_ensemble_summary, get_vlog
+from .utils import INFO_CLR, LogLevel, format_ensemble_summary, get_vlog
 
 
 # === Helpers === #
@@ -245,7 +245,7 @@ class Evaluator:
         
         # Iterate over each model directory and evaluate
         for model_idx, model_path in enumerate(model_paths):
-            self.vlog(f"Evaluating model {model_idx+1}/{len(model_paths)}: {model_path}")
+            self.vlog(f"Evaluating model [{INFO_CLR}]{model_idx+1}[/]/[{INFO_CLR}]{len(model_paths)}[/]: [{INFO_CLR}]{model_path}[/]")
             try:
                 eval_mil(
                     weights=str(model_path),
@@ -281,16 +281,16 @@ class Evaluator:
         # Check if model_dir is a single model directory
         if is_model_directory(model_dir):
             model_paths = [model_dir]
-            self.vlog(f"Single model directory detected: {model_dir}")
+            self.vlog(f"Single model directory detected: [{INFO_CLR}]{model_dir}[/]")
         # Else, collect all model subdirectories
         else:
             if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
-                self.vlog(f"No model directories found in {model_dir}", LogLevel.WARNING)
+                self.vlog(f"No model directories found in [{INFO_CLR}]{model_dir}[/]", LogLevel.WARNING)
                 return
         
         # Iterate over each model directory and generate predictions
         for model_idx, model_path in enumerate(model_paths):
-            self.vlog(f"Generating predictions with model {model_idx+1}/{len(model_paths)}: {model_path}")
+            self.vlog(f"Generating predictions with model [{INFO_CLR}]{model_idx+1}[/]/[{INFO_CLR}]{len(model_paths)}[/]: [{INFO_CLR}]{model_path}[/]")
             try:
                 predictions = predict_mil(
                     model=str(model_path),
@@ -307,7 +307,7 @@ class Evaluator:
                 model_out_dir.mkdir(parents=True, exist_ok=True)
                 predictions_path = model_out_dir / "predictions.parquet"
                 predictions.to_parquet(predictions_path, index=False)
-                self.vlog(f"Predictions saved to {predictions_path}")
+                self.vlog(f"Predictions saved to [{INFO_CLR}]{predictions_path}[/]")
 
             except Exception as e:
                 self.vlog(f"Error evaluating model at {model_path}: {e}", LogLevel.ERROR)
@@ -338,11 +338,11 @@ class Evaluator:
         # Check if model_dir is a single model directory
         if is_model_directory(model_dir):
             model_paths = [model_dir]
-            self.vlog(f"Single model directory detected: {model_dir}")
+            self.vlog(f"Single model directory detected: [{INFO_CLR}]{model_dir}[/]")
         # Else, collect all model subdirectories
         else:
             if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
-                self.vlog(f"No model directories found in {model_dir}", LogLevel.WARNING)
+                self.vlog(f"No model directories found in [{INFO_CLR}]{model_dir}[/]", LogLevel.WARNING)
                 raise ValueError("No model directories found for ensembling")
 
         # Try to load predictions from each model that has been evaluated (should all be in model_dir)
@@ -357,7 +357,7 @@ class Evaluator:
                 predictions = predictions.rename(columns=rename_map)
                 predictions_list.append(predictions)
 
-                self.vlog(f"Loaded predictions from model {submodel_dir.name} ({model_idx+1}/{len(os.listdir(model_dir))})")
+                self.vlog(f"Loaded predictions from model [{INFO_CLR}]{submodel_dir.name}[/] ([{INFO_CLR}]{model_idx+1}[/]/[{INFO_CLR}]{len(os.listdir(model_dir))}[/])")
             except Exception as e:
                 self.vlog(f"Error loading predictions from {submodel_dir}: {e}", LogLevel.WARNING)
                 continue
@@ -403,7 +403,7 @@ class Evaluator:
                     class_prediction_columns[class_idx]
                 ].mean(axis=1)
             else:
-                self.vlog(f"No prediction columns found for class {class_idx}")
+                self.vlog(f"No prediction columns found for class [{INFO_CLR}]{class_idx}[/]")
                 ensemble_probs[f"y_pred{class_idx}_ensemble"] = 0.0
 
         # Add ensemble probabilities to DataFrame
@@ -437,7 +437,7 @@ class Evaluator:
             merged.to_csv(output_path, index=False)
         else:
             merged.to_parquet(output_path, index=False)
-        self.vlog(f"Ensemble predictions saved to {output_path}")
+        self.vlog(f"Ensemble predictions saved to [{INFO_CLR}]{output_path}[/]")
 
         return merged, metrics
 
@@ -460,11 +460,11 @@ class Evaluator:
         # Check if model_dir is a single model directory
         if is_model_directory(model_dir):
             model_paths = [model_dir]
-            self.vlog(f"Single model directory detected: {model_dir}")
+            self.vlog(f"Single model directory detected: [{INFO_CLR}]{model_dir}[/]")
         # Else, collect all model subdirectories
         else:
             if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
-                self.vlog(f"No model directories found in {model_dir}", LogLevel.WARNING)
+                self.vlog(f"No model directories found in [{INFO_CLR}]{model_dir}[/]", LogLevel.WARNING)
                 raise ValueError("No model directories found for comparison")
 
         comparison_data = []
@@ -488,7 +488,7 @@ class Evaluator:
                 comparison_data.append(row)
                 
             except Exception as e:
-                self.vlog(f"Failed to evaluate {model_path.name}: {e}", LogLevel.WARNING)
+                self.vlog(f"Failed to evaluate [{INFO_CLR}]{model_path.name}[/]: {e}", LogLevel.WARNING)
                 continue
         
         comparison_df = pd.DataFrame(comparison_data)
@@ -553,7 +553,7 @@ class Evaluator:
         for plot_name, fig in plots.items():
             plot_file = save_path / f"{plot_name}.png"
             fig.savefig(plot_file, dpi=300, bbox_inches='tight')
-            self.vlog(f"Saved plot '{plot_name}' to {plot_file}")
+            self.vlog(f"Saved plot '[{INFO_CLR}]{plot_name}[/]' to [{INFO_CLR}]{plot_file}[/]")
         return
 
     def _plot_roc_curves(

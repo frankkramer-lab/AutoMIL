@@ -173,7 +173,7 @@ class Trainer:
             outdir = self.model_outdir / model_label_override
         else:
             outdir = Path(self.config.prepare_training("label", exp_label=None, outdir=str(self.model_outdir)))
-        self.vlog(f"Output directory: {outdir}")
+        self.vlog(f"Output directory: [{INFO_CLR}]{outdir}[/]")
         
         # Prepare validation bags
         val_bags = self._prepare_validation_bags()
@@ -230,7 +230,7 @@ class Trainer:
             # Save predictions
             pred_out = outdir / 'predictions.parquet'
             df.to_parquet(pred_out)
-            self.vlog(f"Predictions saved to {pred_out}")
+            self.vlog(f"Predictions saved to [{INFO_CLR}]{pred_out}[/]")
         
             # Calculate and display metrics
             self._run_metrics(df, "label", str(outdir))
@@ -257,7 +257,7 @@ class Trainer:
             _ = learner.model(*dummy_input)
         self.actual_mem_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
         
-        self.vlog(f"Training completed: {self.model.model_name}")
+        self.vlog(f"Training completed: [{INFO_CLR}]{self.model.model_name}[/]")
         return learner
 
     def train_k_fold(self, base_model_label_override: str | None = None) -> list[Learner]:
@@ -273,12 +273,12 @@ class Trainer:
         outdir = self.model_outdir
         if base_model_label_override:
             outdir = outdir / base_model_label_override
-        self.vlog(f"K-Fold output directory: {outdir}")
+        self.vlog(f"K-Fold output directory: [{INFO_CLR}]{outdir}[/]")
         
         learners = []
         for fold in range(self.k):
             self.vlog(f"=" * 50)
-            self.vlog(f"Training fold {fold + 1}/{self.k}")
+            self.vlog(f"Training fold [{INFO_CLR}]{fold + 1}[/]/[{INFO_CLR}]{self.k}[/]")
             self.vlog(f"=" * 50)
             
             # Create fold-specific paths and labels
@@ -293,7 +293,7 @@ class Trainer:
             )
             learners.append(learner)
         
-        self.vlog(f"Completed {self.k}-fold training")
+        self.vlog(f"Completed [{INFO_CLR}]{self.k}[/]-fold training")
         return learners
 
     def summary(self) -> None:
@@ -356,10 +356,10 @@ class Trainer:
         val_ann = self.val_dataset.annotations
         
         if train_ann is not None and val_ann is not None:
-            self.vlog(f"Train labels: {train_ann['label'].unique()}")
-            self.vlog(f"Train label types: {[type(x) for x in train_ann['label'].unique()]}")
-            self.vlog(f"Val labels: {val_ann['label'].unique()}")  
-            self.vlog(f"Val label types: {[type(x) for x in val_ann['label'].unique()]}")
+            self.vlog(f"Train labels: [{INFO_CLR}]{train_ann['label'].unique()}[/]")
+            self.vlog(f"Train label types: [{INFO_CLR}]{[type(x) for x in train_ann['label'].unique()]}[/]")
+            self.vlog(f"Val labels: [{INFO_CLR}]{val_ann['label'].unique()}[/]")  
+            self.vlog(f"Val label types: [{INFO_CLR}]{[type(x) for x in val_ann['label'].unique()]}[/]")
         else:
             self.vlog("WARNING: One or both datasets have no annotations")
 
@@ -373,7 +373,7 @@ class Trainer:
             list: list of validation bag paths
         """
         val_bags = self.val_dataset.get_bags(str(self.bags_path))
-        self.vlog(f"Found {len(val_bags)} validation bags")
+        self.vlog(f"Found [{INFO_CLR}]{len(val_bags)}[/] validation bags")
         return val_bags.tolist()
     
     def _log_mil_params(
@@ -441,7 +441,7 @@ class Trainer:
         # Convert attention dict to list of arrays
         attention_arrays = list(attention.values())
         utils._export_attention(attention_dir, attention_arrays, bag_names)
-        self.vlog(f"Attention arrays exported to {attention_dir}")
+        self.vlog(f"Attention arrays exported to [{INFO_CLR}]{attention_dir}[/]")
     
     def _generate_heatmaps(self, val_bags: list, attention: dict, outdir: str) -> None:
         """Generate a heatmap using slideflow
@@ -458,7 +458,7 @@ class Trainer:
             bags=val_bags,
             attention=list(attention.values()),
         )
-        self.vlog(f"Attention heatmaps generated in {heatmap_dir}")
+        self.vlog(f"Attention heatmaps generated in [{INFO_CLR}]{heatmap_dir}[/]")
     
     def _compute_optimal_batch_size(self) -> int:
         """Compute VRAM-Optimal batch size based on estimated model memory usage and free memory

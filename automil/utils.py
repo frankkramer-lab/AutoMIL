@@ -512,10 +512,10 @@ def convert_worker(in_path: Path, out_folder: Path, verbose: bool = True) -> Pat
         return out_path
 
     if err := convert_img_to_tiff(in_path, out_path):
-        vlog(f"Error while converting {in_path}: {err}")
+        vlog(f"Error while converting [{INFO_CLR}]{in_path}[/]: {err}")
         return None
     else:
-        vlog(f"Successfully converted {in_path.name}")
+        vlog(f"Successfully converted [{INFO_CLR}]{in_path.name}[/]")
         return out_path
 
 def batch_conversion(file_list: list[Path], out_folder: Path, verbose: bool = True) -> list[Path]:
@@ -541,15 +541,15 @@ def batch_conversion(file_list: list[Path], out_folder: Path, verbose: bool = Tr
 
         # Skip already converted images
         if out_path.exists():
-            vlog(f"{out_path} already exists. Skipping")
+            vlog(f"[{INFO_CLR}]{out_path}[/] already exists. Skipping")
             out_list.append(out_path)
             continue
         
         # Convert image to tiff
         if err := convert_img_to_tiff(in_path, out_path):
-            vlog(f"Error while converting {in_path}: {err}")
+            vlog(f"Error while converting [{INFO_CLR}]{in_path}[/]: {err}")
         else:
-            vlog(f"Successfully converted {in_path.name}")
+            vlog(f"Successfully converted [{INFO_CLR}]{in_path.name}[/]")
             out_list.append(out_path)
         
     return out_list
@@ -696,17 +696,17 @@ def pretiled_to_tfrecords(
         slide_id = slide_dir.name
         tfrecord_path = outdir / f"{slide_id}.tfrecords"
         if tfrecord_path.exists() and not overwrite:
-            vlog(f"{tfrecord_path} already exists. Skipping.")
+            vlog(f"[{INFO_CLR}]{tfrecord_path}[/] already exists. Skipping.")
             continue
         
         extensions = [".png", ".svs", ".tif", ".tiff"]
         tile_paths = sorted([tile for tile in slide_dir.iterdir() if tile.suffix in extensions])
         if not tile_paths:
-            vlog(f"No tiles found in {slide_dir}, skipping.")
+            vlog(f"No tiles found in [{INFO_CLR}]{slide_dir}[/], skipping.")
             continue
 
         writer = TFRecordWriter(str(tfrecord_path))
-        vlog(f"Writing {len(tile_paths)} tiles for {slide_id}")
+        vlog(f"Writing [{INFO_CLR}]{len(tile_paths)}[/] tiles for [{INFO_CLR}]{slide_id}[/]")
 
         for idx, tile_path in enumerate(tile_paths):
             # Aritrary grid location
@@ -763,7 +763,7 @@ def pretiled_to_tfrecords_multi(
     vlog = get_vlog(verbose)
     outdir.mkdir(parents=True, exist_ok=True)
 
-    vlog(f"Converting pretiled images in {pretiled_root} to TFRecords in {outdir}")
+    vlog(f"Converting pretiled images in [{INFO_CLR}]{pretiled_root}[/] to TFRecords in [{INFO_CLR}]{outdir}[/]")
     # Use write_tfrecords_multi to process multiple slide subdirectories
     # Each subdirectory name is taken as a slide name
     write_tfrecords_multi(
