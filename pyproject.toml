@@ -41,6 +41,20 @@ automil = "automil.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["automil"]
 
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+pythonpath = ["automil"]
+
+filterwarnings = [
+    "ignore::DeprecationWarning:slideflow",
+    "ignore::UserWarning:slideflow\\.plugin",
+    "ignore::DeprecationWarning:pkg_resources",
+    "ignore:the load_module\\(\\) method is deprecated:DeprecationWarning",
+    "ignore::FutureWarning:timm\\.models\\.helpers",
+    "ignore::FutureWarning:timm\\.models\\.layers",
+]
+
 [tool.hatch.build.targets.sdist]
 include = [
     "/automil",
