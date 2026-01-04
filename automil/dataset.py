@@ -101,8 +101,9 @@ class Dataset():
         """
         if self.is_pretiled:
             self.vlog(f"Preparing dataset source from pretiled slides at [{INFO_CLR}]{self.slide_dir}[/]")
-        self.vlog(f"Preparing dataset source at resolution [{INFO_CLR}]{self.resolution.name} "
-                  f"({self.tile_px}px, {self.tile_um:.2f}um)[/]")
+        else:
+            self.vlog(f"Preparing dataset source at resolution [{INFO_CLR}]{self.resolution.name} "
+                f"({self.tile_px}px, {self.tile_um:.2f}um)[/]")
 
         # Convert pretiled to tfrecords
         if self.is_pretiled:

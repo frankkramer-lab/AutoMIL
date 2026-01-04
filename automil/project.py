@@ -38,7 +38,7 @@ def contains_columns(data: pd.DataFrame | Path, columns: Iterable[str], return_m
                 data = pd.read_csv(data)
 
     if return_missing:
-        return set(data.columns) - set(columns)
+        return set(columns) - set(data.columns)
     else:
         return set(columns).issubset(set(data.columns))   
 
@@ -229,7 +229,7 @@ class Project:
                 If the output annotations file cannot be written.
         """
         # Make sure given columns exist
-        if not (missing := contains_columns(self.annotations_file, self.required_columns, return_missing=True)):
+        if (missing := contains_columns(self.annotations_file, self.required_columns, return_missing=True)):
             raise ValueError(f"Annotations file is missing required columns: {missing}")
 
         # Load annotations
