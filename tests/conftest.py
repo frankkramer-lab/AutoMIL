@@ -42,3 +42,10 @@ def mock_project(project_factory) -> MagicMock:
 def base_project(project_factory) -> AutoMIL_Project:
     """Fixture that provides a base Project instance."""
     return project_factory(kind="base")
+
+@pytest.fixture
+def mock_sf_dataset():
+    dataset = MagicMock()
+    dataset.annotations = None
+    dataset.get_bags.return_value = []
+    return dataset
