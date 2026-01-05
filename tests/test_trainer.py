@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pandas as pd
 import pytest
@@ -114,6 +114,7 @@ def test_estimated_size_mb_delegates_to_estimator(
 ):
     with (
         patch("automil.trainer.get_bag_avg_and_num_features", return_value=(64, 512)),
+        patch.object(Trainer, "adjusted_batch_size", new_callable=PropertyMock, return_value=16),
         patch("automil.trainer.estimate_model_size", return_value=321.5) as mock_estimate,
     ):
         trainer = Trainer(
@@ -127,8 +128,14 @@ def test_estimated_size_mb_delegates_to_estimator(
         size = trainer.estimated_size_mb
 
         assert size == 321.5
-        mock_estimate.assert_called_once()
-
+        mock_estimate.assert_called_once_with(
+            model_type=ModelType.Attention_MIL,
+            batch_size=16,
+            bag_size=64,
+            input_dim=512,
+            num_classes=trainer.num_classes,
+        )
+        
 def test_device_cpu_when_cuda_unavailable(
     mock_project,
     mock_sf_dataset,
@@ -155,6 +162,7 @@ def test_config_is_built_via_mil_config(
 
     with (
         patch("automil.trainer.get_bag_avg_and_num_features", return_value=(32, 256)),
+        patch.object(Trainer, "adjusted_batch_size", new_callable=PropertyMock, return_value=8),
         patch("automil.trainer.mil_config", return_value=fake_config) as mock_mil_config,
     ):
         trainer = Trainer(
@@ -170,4 +178,11 @@ def test_config_is_built_via_mil_config(
         cfg = trainer.config
 
         assert cfg is fake_config
-        mock_mil_config.assert_called_once()
+        mock_mil_config.assert_called_once_with(
+            model=trainer.model.model_name,
+            trainer="fastai",
+            lr=1e-4,
+            epochs=10,
+            batch_size=8,
+        )
+
