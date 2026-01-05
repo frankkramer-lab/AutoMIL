@@ -11,7 +11,6 @@ import cv2
 import numpy as np
 import openslide
 import pandas as pd
-import pyvips
 import slideflow as sf
 import torch
 import torch.nn as nn
@@ -511,6 +510,14 @@ def convert_img_to_tiff(in_path: Path, out_path: Path) -> str:
     Returns:
         Error message in case of failure or an empty string in case of success.
     """
+    try:
+        import pyvips
+    except ImportError as e:
+        raise RuntimeError(
+            "pyvips is required for TIFF conversion. "
+            "Install with: pip install automil[vips]"
+        ) from e
+
     try:
         image = pyvips.Image.new_from_file(in_path)
         if not isinstance(image, pyvips.Image):
