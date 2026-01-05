@@ -30,7 +30,16 @@ dependencies = [
     "seaborn>=0.12.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
+    "fastai>=2.7.0",
+    "ipython>=8.0.0",
 ]
+
+[project.optional-dependencies]
+test = [
+  "pytest",
+  "pytest-cov",
+]
+
 
 [project.urls]
 Homepage = "https://github.com/jonas/AutoMIL"

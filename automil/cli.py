@@ -10,16 +10,9 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 from pathlib import Path
 
 import click
-import slideflow as sf
 
-# === Internal modules === #
-from .dataset import Dataset
-from .evaluation import Evaluator
-from .project import Project
-from .trainer import Trainer
-from .utils import (HIGHLIGHT_CLR, INFO_CLR, RESOLUTION_PRESETS, SUCCESS_CLR,
-                    LogLevel, ModelType, configure_image_backend, get_vlog,
-                    is_input_pretiled)
+# === Internal Imports === #
+from .utils import RESOLUTION_PRESETS, ModelType
 
 # === Setup === #
 CONTEXT_SETTINGS = {
@@ -198,6 +191,15 @@ def run_pipeline(
       ├── annotations.csv # Processed annotations
       └── results.json    # Performance metrics
     """
+    import slideflow as sf
+
+    from .dataset import Dataset
+    from .evaluation import Evaluator
+    from .project import Project
+    from .trainer import Trainer
+    from .utils import (INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType,
+                        configure_image_backend, get_vlog, is_input_pretiled)
+
     # Getting a verbose logger
     vlog = get_vlog(verbose)
     sf.setLoggingLevel(20) # INFO: 20, DEBUG: 10
@@ -476,6 +478,14 @@ def train(
       ├── annotations.csv # Processed annotations
       └── results.json    # Performance metrics
     """
+    import slideflow as sf
+
+    from .dataset import Dataset
+    from .project import Project
+    from .trainer import Trainer
+    from .utils import (INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType,
+                        configure_image_backend, get_vlog, is_input_pretiled)
+
     # Getting a verbose logger
     vlog = get_vlog(verbose)
     sf.setLoggingLevel(20) # INFO: 20, DEBUG: 10
@@ -689,6 +699,12 @@ def predict(
         If multiple models are used, separate output files will be created for each model,
         adding a suffix with the model name to the specified OUTPUT_DIR path.
     """
+    import slideflow as sf
+
+    from .evaluation import Evaluator
+    from .project import Project
+    from .utils import INFO_CLR, LogLevel, get_vlog
+
     # Getting a verbose logger
     vlog = get_vlog(verbose)
     sf.setLoggingLevel(20) # INFO: 20, DEBUG: 10
@@ -840,6 +856,12 @@ def evaluate(
         If multiple models are used, separate output files will be created for each model,
         adding a suffix with the model name to the specified OUTPUT_DIR path.
     """
+    import slideflow as sf
+
+    from .evaluation import Evaluator
+    from .project import Project
+    from .utils import INFO_CLR, LogLevel, get_vlog
+
     # Getting a verbose logger
     vlog = get_vlog(verbose)
     sf.setLoggingLevel(20) # INFO: 20, DEBUG: 10
@@ -938,6 +960,10 @@ def create_split(
           "test":  ["slide3", "slide4", ...]
         }
     """
+    import slideflow as sf
+
+    from .utils import INFO_CLR, LogLevel, get_vlog
+
     # Getting a verbose logger
     vlog = get_vlog(verbose)
     sf.setLoggingLevel(20) # INFO: 20, DEBUG: 10
