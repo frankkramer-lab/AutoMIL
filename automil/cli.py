@@ -11,15 +11,15 @@ from pathlib import Path
 
 import click
 
-# === Internal Imports === #
-from .utils import RESOLUTION_PRESETS, ModelType
-
 # === Setup === #
 CONTEXT_SETTINGS = {
     "help_option_names": ["-h", "--help"],
     "max_content_width": 120,
     "show_default": True,
 }
+
+RESOLUTION_CHOICES = ["Ultra_Low", "Low", "High", "Ultra"]
+MODEL_CHOICES = ["Attention_MIL", "TransMIL", "BistroTransformer"]
 
 # === CLI === #
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -53,12 +53,12 @@ def AutoMIL():
     type=str,
     default="Low",
     help=f"Comma-separated list of resolution presets to train on. "
-         f"Available: {', '.join([res.name for res in RESOLUTION_PRESETS])} "
+         f"Available: {', '.join([choice for choice in RESOLUTION_CHOICES])} "
          f"(e.g., 'Low,High')"
 )
 @click.option(
     "-m", "--model",
-    type=(model_choice := click.Choice([model.name for  model in ModelType])),
+    type=(model_choice := click.Choice([choice for choice in MODEL_CHOICES])),
     default=model_choice.choices[0],
     help=f"Model type to train and evaluate"
 )
@@ -364,12 +364,12 @@ def run_pipeline(
     type=str,
     default="Low",
     help=f"Comma-separated list of resolution presets to train on. "
-         f"Available: {', '.join([res.name for res in RESOLUTION_PRESETS])} "
+         f"Available: {', '.join([choice for choice in RESOLUTION_CHOICES])} "
          f"(e.g., 'Low,High')"
 )
 @click.option(
     "-m", "--model",
-    type=(model_choice := click.Choice([model.name for  model in ModelType])),
+    type=(model_choice := click.Choice([choice for choice in MODEL_CHOICES])),
     default=model_choice.choices[0],
     help=f"Model type to train and evaluate"
 )
