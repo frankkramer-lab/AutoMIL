@@ -266,7 +266,6 @@ class Dataset():
         dataset.rebuild_index()
         dataset.update_manifest(force_update=True)
         
-        dataset.slide_manifest()
         if len(dataset.manifest()) == 0:
             raise RuntimeError("Pretiled dataset conversion produced an empty manifest.")
 

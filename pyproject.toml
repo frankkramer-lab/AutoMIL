@@ -31,6 +31,7 @@ dependencies = [
     "numpy>=1.24.0",
     "fastai>=2.7.0",
     "ipython>=8.0.0",
+    "cucim>=0.3.0",
 ]
 
 [project.optional-dependencies]
