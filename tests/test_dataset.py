@@ -108,7 +108,7 @@ def test_tile_um_is_derived_from_mpp_and_tile_px(mock_project):
     Test that tile_um are computed consistently and correctly from tile_px and mpp.
     """
     with (
-        patch("automil.utils.calculate_average_mpp", return_value=0.5),
+        patch("automil.util.slide.calculate_average_mpp", return_value=0.5),
         patch.object(Path, "exists", lambda self: True),
         patch.object(Path, "iterdir", lambda self: iter(()))
     ):
