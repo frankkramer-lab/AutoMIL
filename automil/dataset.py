@@ -12,11 +12,26 @@ import torch
 from slideflow.slide import qc
 from tabulate import tabulate
 
-from .utils import (COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR,
-                    RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel,
-                    batch_conversion_concurrent, batch_generator,
-                    calculate_average_mpp, get_mpp_from_slide, get_vlog,
-                    pretiled_to_tfrecords)
+from .util import (COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR,
+                   RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel, get_vlog)
+from .util.pretiled import pretiled_to_tfrecords
+from .util.slide import calculate_average_mpp, get_mpp_from_slide
+from .util.tiff_conversion import batch_conversion_concurrent, batch_generator
+
+
+# === Helpers === #
+def get_unique_labels(annotations_file: Path, label_column: str) -> list[str]:
+    """Extract list of unique labels from the specified column in the annotations file.
+
+    Args:
+        annotations_file: Path to the annotations CSV file
+        label_column: Name of the column containing labels
+
+    Returns:
+        List of unique labels found in the specified column.
+    """
+    annotations = pd.read_csv(annotations_file)
+    return [str(label) for label in annotations[label_column].dropna().unique()]
 
 
 class Dataset():

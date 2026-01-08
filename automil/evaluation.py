@@ -19,7 +19,7 @@ from sklearn.metrics import (accuracy_score, average_precision_score,
                              confusion_matrix, f1_score, roc_auc_score)
 from slideflow.mil import eval_mil, predict_mil
 
-from .utils import INFO_CLR, LogLevel, format_ensemble_summary, get_vlog
+from .util import INFO_CLR, LogLevel, get_vlog
 
 
 # === Helpers === #
@@ -51,6 +51,59 @@ def is_model_directory(path: Path) -> bool:
         path / "slide_manifest.csv",
     ]
     return all(file.exists() for file in required_files)
+
+def format_ensemble_summary(
+    num_models: int,
+    confusion_matrix: np.ndarray,
+    auc: float,
+    ap: float,
+    acc: float,
+    f1: float,
+) -> str:
+    """
+    Format ensemble evaluation metrics into a readable summary.
+    
+    Args:
+        num_models: Number of models in the ensemble
+        confusion_matrix: Confusion matrix (can be binary 2x2 or multi-class NxN)
+        auc: Area under curve score
+        ap: Average precision score
+        acc: Accuracy score
+        f1: F1 score (macro for multiclass, regular for binary)
+        f1_macro: Macro F1 score (multiclass only)
+        f1_weighted: Weighted F1 score (multiclass only)
+    
+    Returns:
+        Formatted summary string
+    """
+    n_classes = confusion_matrix.shape[0]
+    
+    if n_classes == 2:
+        # Binary classification - original format
+        tn, fp, fn, tp = confusion_matrix.ravel()
+        cm_formatted = f"""
+                 Predicted
+                 0     1
+    Actual 0  {tn:4d}  {fp:4d}
+           1  {fn:4d}  {tp:4d}"""
+    else:
+        # Multi-class classification - matrix format
+        cm_formatted = "\n                 Predicted\n"
+        cm_formatted += "              " + "".join([f"{i:>6}" for i in range(n_classes)]) + "\n"
+        for i, row in enumerate(confusion_matrix):
+            cm_formatted += f"    Actual {i:>1}  " + "".join([f"{val:>6}" for val in row]) + "\n"
+
+    # Build metrics section
+    metrics_text = f"""-- AUC: {auc:.3f}
+-- Average Precision: {ap:.3f}  
+-- Accuracy: {acc:.3%}
+-- F1 Score: {f1:.3f}"""
+    summary = f"""
+Ensemble Evaluation Metrics | Models: {num_models} | Classes: {n_classes}
+{metrics_text}
+-- Confusion Matrix:{cm_formatted}
+"""
+    return summary
 
 class Evaluator:
     """Evaluates trained MIL models, calculates metrics, generates plots, and creates ensemble predictions."""    

@@ -197,8 +197,10 @@ def run_pipeline(
     from .evaluation import Evaluator
     from .project import Project
     from .trainer import Trainer
-    from .utils import (INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType,
-                        configure_image_backend, get_vlog, is_input_pretiled)
+    from .util import (INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType,
+                       get_vlog)
+    from .util.backend import configure_image_backend, has_png_slides
+    from .util.pretiled import is_input_pretiled
 
     # Getting a verbose logger
     vlog = get_vlog(verbose)
@@ -231,14 +233,13 @@ def run_pipeline(
         vlog(f"Using model type: [{INFO_CLR}]{model_type.name}[/]")
 
         # === 2. Image Backend Configuration === #
-        # TODO | Check if this is necessary or if slideflow handles it automatically
-        png_slides_present: bool = any(
-            [slide.suffix.lower() == ".png" for slide in Path(slide_dir).iterdir()]
+        png_slides_present = has_png_slides(slide_dir)
+
+        tiff_conversion = configure_image_backend(
+            slide_dir=slide_dir,
+            needs_png_conversion=png_slides_present,
+            verbose=verbose,
         )
-        # If no PNG slides are present, we configure the image backend
-        if not png_slides_present:
-            configure_image_backend(verbose=verbose)
-        tiff_conversion = png_slides_present
 
         # === 3. Project Creation And Setup === #
         project_setup = Project(
@@ -483,8 +484,10 @@ def train(
     from .dataset import Dataset
     from .project import Project
     from .trainer import Trainer
-    from .utils import (INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType,
-                        configure_image_backend, get_vlog, is_input_pretiled)
+    from .util import (INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType,
+                       get_vlog)
+    from .util.backend import configure_image_backend, has_png_slides
+    from .util.pretiled import is_input_pretiled
 
     # Getting a verbose logger
     vlog = get_vlog(verbose)
@@ -515,14 +518,13 @@ def train(
         vlog(f"Using model type: [{INFO_CLR}]{model_type.name}[/]")
 
         # === 2. Image Backend Configuration === #
-        # TODO | Check if this is necessary or if slideflow handles it automatically
-        png_slides_present: bool = any(
-            [slide.suffix.lower() == ".png" for slide in Path(slide_dir).iterdir()]
+        png_slides_present = has_png_slides(slide_dir)
+
+        tiff_conversion = configure_image_backend(
+            slide_dir=slide_dir,
+            needs_png_conversion=png_slides_present,
+            verbose=verbose,
         )
-        # If no PNG slides are present, we configure the image backend
-        if not png_slides_present:
-            configure_image_backend(verbose=verbose)
-        tiff_conversion = png_slides_present
 
         # === 3. Project Creation And Setup === #
         project_setup = Project(
@@ -703,7 +705,7 @@ def predict(
 
     from .evaluation import Evaluator
     from .project import Project
-    from .utils import INFO_CLR, LogLevel, get_vlog
+    from .util import INFO_CLR, LogLevel, get_vlog
 
     # Getting a verbose logger
     vlog = get_vlog(verbose)
@@ -860,7 +862,7 @@ def evaluate(
 
     from .evaluation import Evaluator
     from .project import Project
-    from .utils import INFO_CLR, LogLevel, get_vlog
+    from .util import INFO_CLR, LogLevel, get_vlog
 
     # Getting a verbose logger
     vlog = get_vlog(verbose)
@@ -962,7 +964,7 @@ def create_split(
     """
     import slideflow as sf
 
-    from .utils import INFO_CLR, LogLevel, get_vlog
+    from .util import INFO_CLR, LogLevel, get_vlog
 
     # Getting a verbose logger
     vlog = get_vlog(verbose)

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from automil.dataset import Dataset
-from automil.utils import COMMON_MPP_VALUES, RESOLUTION_PRESETS
+from automil.util import COMMON_MPP_VALUES, RESOLUTION_PRESETS
 
 
 def test_dataset_initialization(mock_project):

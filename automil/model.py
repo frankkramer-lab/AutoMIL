@@ -10,8 +10,49 @@ import torch.nn as nn
 from slideflow.mil.models import Attention_MIL, TransMIL
 from slideflow.mil.models.bistro.transformer import \
     Attention as BistroTransformer
+from slideflow.util import log as slideflow_log
 
-from .utils import MAX_BATCH_SIZE, ModelType
+from .util import MAX_BATCH_SIZE, ModelType
+
+
+def create_model_instance(
+    model_type: ModelType,
+    input_dim: int,
+    n_out: int = 2
+) -> nn.Module:
+    """Safely create a model instance with the correct parameters.
+    
+    Args:
+        model_type: The ModelType enum
+        input_dim: Input feature dimension
+        n_out: Number of output classes
+        
+    Raise:
+        Exception: If model instantiation fails
+
+    Returns:
+        Instantiated model
+    """
+    try:
+        match model_type:
+
+            case ModelType.Attention_MIL:
+                model_cls = Attention_MIL
+                return model_cls(n_feats=input_dim, n_out=n_out)
+            
+            case ModelType.TransMIL:
+                model_cls = TransMIL
+                return model_cls(n_feats=input_dim, n_out=n_out)
+            
+            case ModelType.BistroTransformer:
+                model_cls = BistroTransformer
+                return model_cls(dim=input_dim)
+
+            case _:
+                return model_cls()
+    except Exception as e:
+        slideflow_log.error(f"Error while creating model instance: {e}")
+        raise e
 
 
 @dataclass

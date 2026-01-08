@@ -6,7 +6,7 @@ import pytest
 
 from automil.model import ModelManager
 from automil.trainer import Trainer
-from automil.utils import BATCH_SIZE, ModelType
+from automil.util import BATCH_SIZE, ModelType
 
 
 def test_trainer_initialization(mock_sf_dataset, mock_project):

@@ -6,8 +6,10 @@ from slideflow.mil.models import Attention_MIL, TransMIL
 from slideflow.mil.models.bistro.transformer import \
     Attention as BistroTransformer
 
-from automil.utils import (RESOLUTION_PRESETS, ModelType, batch_generator,
-                           get_unique_labels, is_input_pretiled)
+from automil.dataset import get_unique_labels
+from automil.util import RESOLUTION_PRESETS, ModelType
+from automil.util.pretiled import is_input_pretiled
+from automil.util.tiff_conversion import batch_generator
 
 
 # === Helper === #
