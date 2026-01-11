@@ -11,6 +11,10 @@ from pathlib import Path
 
 import click
 
+# === Internal imports === #
+from .cli_help import (CREATE_SPLIT_HELP, EVALUATE_HELP, PREDICT_HELP,
+                       RUN_PIPELINE_HELP, TRAIN_HELP)
+
 # === Setup === #
 CONTEXT_SETTINGS = {
     "help_option_names": ["-h", "--help"],
@@ -31,7 +35,8 @@ def AutoMIL():
 @AutoMIL.command(
     name="run-pipeline", 
     context_settings=CONTEXT_SETTINGS,
-    no_args_is_help=True
+    no_args_is_help=True,
+    help=RUN_PIPELINE_HELP
 )
 @click.argument("slide_dir",        type=click.Path(exists=True, file_okay=False))
 @click.argument("annotation_file",  type=click.Path(exists=True, file_okay=True))
@@ -91,72 +96,118 @@ def run_pipeline(
     """
     Execute the complete AutoMIL pipeline for whole slide image analysis.
     
-    \b
-    `run-pipeline` executes the entire AutoMIL workflow, encompassing:
-      [1] Project setup and configuration
-      [2] Dataset preparation and tile extraction  
-      [3] Model training with k-fold cross-validation
-      [4] Model evaluation and ensemble creation
-      [5] Results comparison and visualization
+    This command runs the full AutoMIL workflow, including project setup,
+    dataset preparation, model training with k-fold cross-validation,
+    evaluation, and result visualization.
 
-    \b
-    ARGUMENTS:
-      SLIDE_DIR        Directory containing whole slide images (.svs, .tiff, etc.)
-      ANNOTATION_FILE  .csv file with slide/patient annotations and labels  
-      PROJECT_DIR      Output directory for all results and models
-    
-    \b
-    EXAMPLES:
-      # Basic usage with default settings
-      automil run-pipeline /data/slides /data/annotations.csv ./results
-      
-      # Multi-resolution training with verbose output
-      automil run-pipeline -r "Low,High" -v /data/slides /data/annotations.csv ./results
-      
-      # Custom model and k-fold settings
-      automil run-pipeline -m TransMIL -k 5 /data/slides /data/annotations.csv ./results
-      
-      # Skip tiling if tiles are pre-extracted
-      automil run-pipeline -p /data/slides /data/annotations.csv ./results
-      
-      # Custom column names in the annotation file
-      automil run-pipeline -pc "patient_name" -lc "diagnosis" -sc "slide_name" /data/slides /data/annotations.csv ./results
-      
-      # Provide a predefined train-test split
-      automil run-pipeline --split-file /data/split.json /data/slides /data/annotations.csv ./results
+    Pipeline stages:
 
-    \b
-    ANNOTATION REQUIREMENTS:
-      ANNOTATION_FILE must be a CSV file containing at least the following columns:
-        - Patient IDs (default column name: "patient")
-        - Slide names (default column name: "slide"; optional)
-        - Labels (default column name: "label")
-      By default, AutoMIL looks for columns named "patient", "slide", and "label".
-      By using the options `--patient_column`, `--slide_column`, and `--label_column`,
-      users can specify custom column names as needed (see EXAMPLES)
-    \b
-    MINIMAL ANNOTATION FILE EXAMPLE:
+    1. Project setup and configuration
+    2. Dataset preparation and tile extraction
+    3. Model training with k-fold cross-validation
+    4. Model evaluation and ensemble creation
+    5. Result visualization
+
+    Args:
+        slide_dir (str | Path):
+            Directory containing whole-slide images or pre-extracted tiles.
+
+        annotation_file (str | Path):
+            CSV file containing slide- or patient-level annotations and labels.
+
+        project_dir (str | Path):
+            Output directory where trained models and intermediate files
+            will be written.
+
+        patient_column (str):
+            Name of the column containing patient identifiers.
+
+        label_column (str):
+            Name of the column containing class labels.
+
+        slide_column (str | None):
+            Name of the column containing slide identifiers.
+
+        resolutions (str):
+            Comma-separated list of resolution presets to train on.
+
+        model (str):
+            Model architecture to train.
+
+        k (int):
+            Number of folds used for k-fold cross-validation.
+
+        is_pretiled (bool):
+            Indicates that the input slides are already tiled.
+
+        transform_labels (bool):
+            If enabled, transforms labels to floating-point values.
+
+        verbose (bool):
+            Enables verbose logging output.
+      
+    ### Examples
+
+      Basic usage with default settings:
+        
+        automil run-pipeline /data/slides /data/annotations.csv ./results
+      
+      Multi-resolution training with verbose output:
+
+        automil run-pipeline -r "Low,High" -v /data/slides /data/annotations.csv ./results
+      
+      Custom model and k-fold settings:
+
+        automil run-pipeline -m TransMIL -k 5 /data/slides /data/annotations.csv ./results
+      
+      Skip tiling if tiles are pre-extracted:
+
+        automil run-pipeline -p /data/slides /data/annotations.csv ./results
+      
+      Custom column names in the annotation file:
+
+        automil run-pipeline -pc "patient_name" -lc "diagnosis" -sc "slide_name" /data/slides /data/annotations.csv ./results
+      
+      Provide a predefined train-test split:
+
+        automil run-pipeline --split-file /data/split.json /data/slides /data/annotations.csv ./results
+
+    ### Annotation file requirements
+
+    The annotation file must be a CSV file containing at least the following columns:
+
+    - Patient identifiers (default column name: `patient`)
+    - Slide identifiers (default column name: `slide`; optional)
+    - Class labels (default column name: `label`)
+
+    By default, AutoMIL looks for columns named `patient`, `slide`, and `label`.
+    These defaults can be overridden using the `--patient_column`,
+    `--slide_column`, and `--label_column` options.
+
+    ### Minimal annotation file example
         patient,slide,label
         001,001_1,0
         001,001_2,0
         002,002,1
         003,003,1
 
-    \b
-    EXPECTED SLIDE DIRECTORY STRUCTURE:
-      SLIDE_DIR should contain whole slide images in supported formats
+    ### Expected slide directory structure
+      `SLIDE_DIR` should contain whole slide images in supported formats
       such as .svs, .tiff, or .png.
       Example structure:
+
         /data/slides/
         |-- slide1.svs
         |-- slide2.tiff
         |-- slide3.tiff
-      If slides are in PNG, AutoMIL will first convert them to TIFF for easier processing.
+    
+    ??? Note "PNG Slide Handling"
+        If slides are in PNG, AutoMIL will first convert them to TIFF for easier processing.
 
-    \b
-    USING PRETILED DATA:
+    ### Using pretiled data
       If tiles have already been extracted from the slides, use the `--is_pretiled` flag.
-      In the case of pretiled data, AutoMIL expects the following directory structure for SLIDE_DIR:
+      In the case of pretiled data, AutoMIL expects the following directory structure for `SLIDE_DIR`:
+
         /data/slides/
         |-- slide1/
         |    |-- tile_0_0.png
@@ -166,30 +217,35 @@ def run_pipeline(
         |    |-- tile_0_0.png
         |    |-- tile_0_1.png
         |    |-- ...
-      Tile names are arbitrary but slide subdirectories must match the slide names in ANNOTATION_FILE.
+    
+    ??? Note "Slide name matching"
+        Tile names are arbitrary but slide subdirectories must match the slide names in ANNOTATION_FILE.
 
-    \b
-    PROVIDING A TRAIN TEST SPLIT:
-        Use the `--split-file` option to provide a JSON file defining train-test splits.
-        The JSON file should have the following structure:
+    ### Providing a train-test split
+      Use the `--split-file` option to provide a JSON file defining train-test splits.
+      The JSON file will have the following structure:
+
             {
             "train": ["slide1", "slide2", ...],
             "test":  ["slide3", "slide4", ...]
             }
-        or:
+
+      or:
+
             {
             "train": ["slide1", "slide2", ...],
             "validation":  ["slide3", "slide4", ...]
             }
 
-    \b
-    OUTPUT STRUCTURE:
-      project_dir/
-      ├── bags/           # Extracted tile features
-      ├── models/         # Trained model checkpoints  
-      ├── ensemble/       # Ensemble predictions
-      ├── annotations.csv # Processed annotations
-      └── results.json    # Performance metrics
+    ### Output structure
+
+        project_dir/
+        ├── bags/           # Extracted tile features
+        ├── models/         # Trained model checkpoints  
+        ├── ensemble/       # Ensemble predictions
+        ├── annotations.csv # Processed annotations
+        └── results.json    # Performance metrics
+    
     """
     import slideflow as sf
 
@@ -344,7 +400,12 @@ def run_pipeline(
         vlog(f"Error: {e}", LogLevel.ERROR)
         return
 
-@AutoMIL.command(name="train", context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
+@AutoMIL.command(
+    name="train",
+    context_settings=CONTEXT_SETTINGS,
+    no_args_is_help=True,
+    help=TRAIN_HELP
+)
 @click.argument("slide_dir",        type=click.Path(exists=True, file_okay=False))
 @click.argument("annotation_file",  type=click.Path(exists=True, file_okay=True))
 @click.argument("project_dir",      type=click.Path(file_okay=False))
@@ -396,69 +457,109 @@ def train(
     verbose:          bool
 ):
     """
-    Train a single or multiple MIL models on a given dataset.
-    
-    \b
-    `train` sets up a project and dataset source, then trains MIL models using k-fold cross-validation:
-      [1] Project setup and configuration
-      [2] Dataset preparation and tile extraction  
-      [3] Model training with k-fold cross-validation
+    Train one or more MIL models on a given dataset.
 
-    \b
-    ARGUMENTS:
-      SLIDE_DIR        Directory containing whole slide images (.svs, .tiff, etc.)
-      ANNOTATION_FILE  CSV file with slide/patient annotations and labels  
-      PROJECT_DIR      Output directory for all results and models
-    
-    \b
-    EXAMPLES:
-      # Basic usage with default settings
-      automil train /data/slides /data/annotations.csv ./results
-      
-      # Multi-resolution training with verbose output
-      automil train -r "Low,High" -v /data/slides /data/annotations.csv ./results
-      
-      # Custom model and k-fold settings
-      automil train -m TransMIL -k 5 /data/slides /data/annotations.csv ./results
-      
-      # Skip tiling if tiles are pre-extracted
-      automil train -p /data/slides /data/annotations.csv ./results
-      
-      # Custom column names in the annotation file
-      automil train -pc "patient_name" -lc "diagnosis" -sc "slide_name" /data/slides /data/annotations.csv ./results
+    This command initializes an AutoMIL project, prepares the dataset,
+    and trains MIL models using k-fold cross-validation. Training can be
+    performed at one or multiple resolution presets.
 
-    \b
-    ANNOTATION REQUIREMENTS:
-      ANNOTATION_FILE must be a CSV file containing at least the following columns:
-        - Patient IDs (default column name: "patient")
-        - Slide names (default column name: "slide"; optional)
-        - Labels (default column name: "label")
-      By default, AutoMIL looks for columns named "patient", "slide", and "label".
-      By using the options `--patient_column`, `--slide_column`, and `--label_column`,
-      users can specify custom column names as needed (see EXAMPLES)
-    \b
-    MINIMAL ANNOTATION FILE EXAMPLE:
+    Pipeline stages:
+
+    1. Project setup and configuration
+    2. Dataset preparation and tile extraction
+    3. Model training with k-fold cross-validation
+
+    Args:
+        slide_dir (str | Path):
+            Directory containing whole-slide images or pre-extracted tiles.
+
+        annotation_file (str | Path):
+            CSV file containing slide- or patient-level annotations and labels.
+
+        project_dir (str | Path):
+            Output directory where trained models and intermediate files
+            will be written.
+
+        patient_column (str):
+            Name of the column containing patient identifiers.
+
+        label_column (str):
+            Name of the column containing class labels.
+
+        slide_column (str | None):
+            Name of the column containing slide identifiers.
+
+        resolutions (str):
+            Comma-separated list of resolution presets to train on.
+
+        model (str):
+            Model architecture to train.
+
+        k (int):
+            Number of folds used for k-fold cross-validation.
+
+        is_pretiled (bool):
+            Indicates that the input slides are already tiled.
+
+        transform_labels (bool):
+            If enabled, transforms labels to floating-point values.
+
+        verbose (bool):
+            Enables verbose logging output.
+
+    ### Examples
+      Basic usage with default settings:
+
+        automil train /data/slides /data/annotations.csv ./results
+
+      Multi-resolution training with verbose output::
+
+        automil train -r "Low,High" -v /data/slides /data/annotations.csv ./results
+
+      Custom model and 5-fold configuration:
+
+        automil train -m TransMIL -k 5 /data/slides /data/annotations.csv ./results
+
+      Using pre-tiled slides::
+        
+        automil train -p /data/slides /data/annotations.csv ./results
+
+    ### Annotation file requirements
+
+    The annotation file must be a CSV file containing at least the following columns:
+
+    - Patient identifiers (default column name: `patient`)
+    - Slide identifiers (default column name: `slide`; optional)
+    - Class labels (default column name: `label`)
+
+    By default, AutoMIL looks for columns named `patient`, `slide`, and `label`.
+    These defaults can be overridden using the `--patient_column`,
+    `--slide_column`, and `--label_column` options.
+
+    ### Minimal annotation file example
         patient,slide,label
         001,001_1,0
         001,001_2,0
         002,002,1
         003,003,1
 
-    \b
-    EXPECTED SLIDE DIRECTORY STRUCTURE:
-      SLIDE_DIR should contain whole slide images in supported formats
+    ### Expected slide directory structure
+      `SLIDE_DIR` should contain whole slide images in supported formats
       such as .svs, .tiff, or .png.
       Example structure:
+
         /data/slides/
         |-- slide1.svs
         |-- slide2.tiff
         |-- slide3.tiff
-      If slides are in PNG, AutoMIL will first convert them to TIFF for easier processing.
+    
+    ??? Note "PNG Slide Handling"
+        If slides are in PNG, AutoMIL will first convert them to TIFF for easier processing.
 
-    \b
-    USING PRETILED DATA:
+    ### Using pretiled data
       If tiles have already been extracted from the slides, use the `--is_pretiled` flag.
-      In the case of pretiled data, AutoMIL expects the following directory structure for SLIDE_DIR:
+      In the case of pretiled data, AutoMIL expects the following directory structure for `SLIDE_DIR`:
+
         /data/slides/
         |-- slide1/
         |    |-- tile_0_0.png
@@ -468,17 +569,37 @@ def train(
         |    |-- tile_0_0.png
         |    |-- tile_0_1.png
         |    |-- ...
-      Tile names are arbitrary but slide subdirectories must match the slide names in ANNOTATION_FILE.
+    
+    ??? Note "Slide name matching"
+        Tile names are arbitrary but slide subdirectories must match the slide names in ANNOTATION_FILE.
 
-    \b
-    OUTPUT STRUCTURE:
-      project_dir/
-      ├── bags/           # Extracted tile features
-      ├── models/         # Trained model checkpoints  
-      ├── ensemble/       # Ensemble predictions
-      ├── annotations.csv # Processed annotations
-      └── results.json    # Performance metrics
+    ### Providing a train-test split
+      Use the `--split-file` option to provide a JSON file defining train-test splits.
+      The JSON file will have the following structure:
+
+            {
+            "train": ["slide1", "slide2", ...],
+            "test":  ["slide3", "slide4", ...]
+            }
+
+      or:
+
+            {
+            "train": ["slide1", "slide2", ...],
+            "validation":  ["slide3", "slide4", ...]
+            }
+
+    ### Output structure
+
+        project_dir/
+        ├── bags/           # Extracted tile features
+        ├── models/         # Trained model checkpoints  
+        ├── ensemble/       # Ensemble predictions
+        ├── annotations.csv # Processed annotations
+        └── results.json    # Performance metrics
+    
     """
+
     import slideflow as sf
 
     from .dataset import Dataset
@@ -601,7 +722,12 @@ def train(
         vlog(f"Error: {e}", LogLevel.ERROR)
         return
 
-@AutoMIL.command(name="predict", context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
+@AutoMIL.command(
+    name="predict",
+    context_settings=CONTEXT_SETTINGS,
+    no_args_is_help=True,
+    help=PREDICT_HELP
+)
 @click.argument("slide_dir",    type=click.Path(exists=True, file_okay=False))
 @click.argument("annotation_file",  type=click.Path(exists=True, file_okay=True))
 @click.argument("bags_dir",     type=click.Path(exists=True, file_okay=False))
@@ -636,71 +762,109 @@ def predict(
     verbose:     bool
 ):
     """
-    Generate predictions using a single or multiple trained MIL models.
+    Generate predictions using one or more trained MIL models.
 
-    \b
-    `predict` loads all available model checkpoints from MODEL_DIR and generates predictions
-    on the slides in SLIDE_DIR using the corresponding tile features in BAGS_DIR.
-    The results are saved to OUTPUT_FILE.
+    This command loads trained model checkpoints and generates predictions
+    for the slides in `SLIDE_DIR` using precomputed tile feature bags from
+    `BAGS_DIR`. Predictions are written to the specified output directory.
 
-    \b
-    ARGUMENTS:
-        SLIDE_DIR     Directory containing whole slide images (.svs, .tiff, ...)
-        ANNOTATION_FILE  .csv file with slide/patient annotations and labels
-        BAGS_DIR      Directory containing tile feature bags (.pt files)
-        MODEL_DIR     Directory containing trained model checkpoints (.pth files)
+    Args:
+        slide_dir (str | Path):
+            Directory containing whole-slide images.
 
-    \b
-    EXAMPLES:
-      # Generate predictions with multiple models (generates one output file per model)
-      automil predict /data/slides /data/annotations.csv /data/bags /data/models/ -o ./predictions
+        annotation_file (str | Path):
+            CSV file containing slide- or patient-level annotations and labels.
 
-      # Generate predictions with a single model
-      automil predict /data/slides /data/annotations.csv /data/bags /data/models/model_1 -v
-    
-      # Generate predictions with a single model (override column names)
-      automil predict -pc "patient_id" -lc "outcome" -sc "slide_id" /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./predictions
-    
-    \b
-    EXPECTED MODEL DIRECTORY STRUCTURE:
-        MODEL_DIR can refer to a single model directory (containing one .pth file) or
-        a parent directory containing multiple model subdirectories with .pth files.
-        EXAMPLE STRUCTURE FOR A SINGLE MODEL:
-            /data/models/model_1/
-                |-- best_valid.pth
-                |....
-        EXAMPLE STRUCTURE FOR MULTIPLE MODELS:
-          /data/models/
-            |-- model_1/
-            |    |-- best_valid.pth
-            |-- model_2/
-            |    |-- best_valid.pth
-            |    |...
-    
-    \b
-    ANNOTATION REQUIREMENTS:
-      ANNOTATION_FILE must be a CSV file containing at least the following columns:
-        - Patient IDs (default column name: "patient")
-        - Slide names (default column name: "slide"; optional)
-        - Labels (default column name: "label")
-      By default, AutoMIL looks for columns named "patient", "slide", and "label".
-      By using the options `--patient_column`, `--slide_column`, and `--label_column`,
-      users can specify custom column names as needed (see EXAMPLES)
-    \b
-    MINIMAL ANNOTATION FILE EXAMPLE:
+        bags_dir (str | Path):
+            Directory containing extracted tile feature bags.
+
+        model_dir (str | Path):
+            Directory containing trained model checkpoints.
+
+        output_dir (str | Path):
+            Directory to which prediction files will be written.
+
+        patient_column (str):
+            Name of the column containing patient identifiers.
+
+        label_column (str):
+            Name of the column containing class labels.
+
+        slide_column (str | None):
+            Name of the column containing slide identifiers.
+
+        verbose (bool):
+            Enables verbose logging output.
+
+    ### Examples
+
+    Basic usage with multiple models:
+
+        automil predict /data/slides /data/annotations.csv /data/bags /data/models -o ./predictions
+
+    Generate predictions with a single model:
+
+        automil predict /data/slides /data/annotations.csv /data/bags /data/models/model_1 -v
+
+    Override annotation column names:
+
+        automil predict -pc "patient_id" -lc "outcome" -sc "slide_id" \
+            /data/slides /data/annotations.csv /data/bags /data/models/model_1 \
+            -o ./predictions
+
+    ### Expected model directory structure
+
+    `MODEL_DIR` may either point to a single model directory or to a parent
+    directory containing multiple model subdirectories.
+
+    Single model example:
+
+        /data/models/model_1/
+        |-- best_valid.pth
+        |-- ...
+
+    Multiple models example:
+
+        /data/models/
+        |-- model_1/
+        |    |-- best_valid.pth
+        |-- model_2/
+        |    |-- best_valid.pth
+        |    |-- ...
+
+    ??? Note "Multiple models"
+        When multiple models are provided, AutoMIL generates a separate
+        prediction file for each model.
+
+    ### Annotation file requirements
+
+    The annotation file must be a CSV file containing at least the following columns:
+
+    - Patient identifiers (default column name: `patient`)
+    - Slide identifiers (default column name: `slide`; optional)
+    - Class labels (default column name: `label`)
+
+    By default, AutoMIL looks for columns named `patient`, `slide`, and `label`.
+    These defaults can be overridden using the `--patient_column`,
+    `--slide_column`, and `--label_column` options.
+
+    ### Minimal annotation file example
+
         patient,slide,label
         001,001_1,0
         001,001_2,0
         002,002,1
         003,003,1
-    
-    \b
-    OUTPUT DIRECTORY FORMAT:
-        OUTPUT_DIR should be a directory path.
-        Predictions will be saved in separate .csv or .parquet files within this directory.
-        If multiple models are used, separate output files will be created for each model,
-        adding a suffix with the model name to the specified OUTPUT_DIR path.
+
+    ### Output directory format
+
+    `OUTPUT_DIR` must be a directory path. Prediction results are saved as
+    separate `.csv` or `.parquet` files inside this directory.
+
+    When multiple models are used, output files include a suffix indicating
+    the corresponding model.
     """
+
     import slideflow as sf
 
     from .evaluation import Evaluator
@@ -758,7 +922,12 @@ def predict(
         vlog(f"Error: {e}", LogLevel.ERROR)
         return
 
-@AutoMIL.command(name="evaluate", context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
+@AutoMIL.command(
+    name="evaluate",
+    context_settings=CONTEXT_SETTINGS,
+    no_args_is_help=True,
+    help=EVALUATE_HELP
+)
 @click.argument("slide_dir",    type=click.Path(exists=True, file_okay=False))
 @click.argument("annotation_file",  type=click.Path(exists=True, file_okay=True))
 @click.argument("bags_dir",     type=click.Path(exists=True, file_okay=False))
@@ -793,70 +962,108 @@ def evaluate(
     verbose:     bool
 ):
     """
-    Evaluate a single or multiple trained MIL models.
+    Evaluate one or more trained MIL models on a labeled dataset.
 
-    \b
-    `evaluate` loads all available model checkpoints from MODEL_DIR, generates predictions
-    on the slides in SLIDE_DIR using the corresponding tile features in BAGS_DIR and evaluates them.
-    The results are saved to OUTPUT_FILE.
+    This command generates predictions for the slides in `SLIDE_DIR` using
+    trained models from `MODEL_DIR` and corresponding tile feature bags from
+    `BAGS_DIR`. The predictions are evaluated against the provided annotations,
+    and summary metrics and plots are generated.
 
-    \b
-    ARGUMENTS:
-        SLIDE_DIR     Directory containing whole slide images (.svs, .tiff, ...)
-        ANNOTATION_FILE  .csv file with slide/patient annotations and labels
-        BAGS_DIR      Directory containing tile feature bags (.pt files)
-        MODEL_DIR     Directory containing trained model checkpoints (.pth files)
+    Args:
+        slide_dir (str | Path):
+            Directory containing whole-slide images.
 
-    \b
-    EXAMPLES:
-      # Evaluate a single model
-      automil evaluate /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./results
+        annotation_file (str | Path):
+            CSV file containing slide- or patient-level annotations and labels.
 
-      # Evaluate multiple models (generates one output file per model)
-      automil evaluate /data/slides /data/annotations.csv /data/bags /data/models/ -v
-    
-      # Evaluate a single model (override column names)
-      automil evaluate -pc "patient_id" -lc "outcome" -sc "slide_id" /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./results      
-    
-    \b
-    EXPECTED MODEL DIRECTORY STRUCTURE:
-        MODEL_DIR can refer to a single model directory (containing one .pth file) or
-        a parent directory containing multiple model subdirectories with .pth files.
-        EXAMPLE STRUCTURE FOR A SINGLE MODEL:
-            /data/models/model_1/
-                |-- best_valid.pth
-                |....
-        EXAMPLE STRUCTURE FOR MULTIPLE MODELS:
-          /data/models/
-            |-- model_1/
-            |    |-- best_valid.pth
-            |-- model_2/
-            |    |-- best_valid.pth
-            |    |...
-    
-    \b
-    ANNOTATION REQUIREMENTS:
-      ANNOTATION_FILE must be a CSV file containing at least the following columns:
-        - Patient IDs (default column name: "patient")
-        - Slide names (default column name: "slide"; optional)
-        - Labels (default column name: "label")
-      By default, AutoMIL looks for columns named "patient", "slide", and "label".
-      By using the options `--patient_column`, `--slide_column`, and `--label_column`,
-      users can specify custom column names as needed (see EXAMPLES)
-    \b
-    MINIMAL ANNOTATION FILE EXAMPLE:
+        bags_dir (str | Path):
+            Directory containing extracted tile feature bags.
+
+        model_dir (str | Path):
+            Directory containing trained model checkpoints.
+
+        output_dir (str | Path):
+            Directory to which evaluation results will be written.
+
+        patient_column (str):
+            Name of the column containing patient identifiers.
+
+        label_column (str):
+            Name of the column containing class labels.
+
+        slide_column (str | None):
+            Name of the column containing slide identifiers.
+
+        verbose (bool):
+            Enables verbose logging output.
+
+    ### Examples
+
+    Evaluate a single model:
+
+        automil evaluate /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./results
+
+    Evaluate multiple models:
+
+        automil evaluate /data/slides /data/annotations.csv /data/bags /data/models -v
+
+    Override annotation column names:
+
+        automil evaluate -pc "patient_id" -lc "outcome" -sc "slide_id" \
+            /data/slides /data/annotations.csv /data/bags /data/models/model_1 \
+            -o ./results
+
+    ### Expected model directory structure
+
+    `MODEL_DIR` may refer either to a single model directory or to a parent
+    directory containing multiple model subdirectories.
+
+    Single model example:
+
+        /data/models/model_1/
+        |-- best_valid.pth
+        |-- ...
+
+    Multiple models example:
+
+        /data/models/
+        |-- model_1/
+        |    |-- best_valid.pth
+        |-- model_2/
+        |    |-- best_valid.pth
+        |    |-- ...
+
+    ??? Note "Multiple models"
+        When multiple models are evaluated, AutoMIL generates separate
+        evaluation results for each model and compares their performance.
+
+    ### Annotation file requirements
+
+    The annotation file must be a CSV file containing at least the following columns:
+
+    - Patient identifiers (default column name: `patient`)
+    - Slide identifiers (default column name: `slide`; optional)
+    - Class labels (default column name: `label`)
+
+    By default, AutoMIL looks for columns named `patient`, `slide`, and `label`.
+    These defaults can be overridden using the `--patient_column`,
+    `--slide_column`, and `--label_column` options.
+
+    ### Minimal annotation file example
+
         patient,slide,label
         001,001_1,0
         001,001_2,0
         002,002,1
         003,003,1
 
-    \b
-    OUTPUT DIRECTORY FORMAT:
-        OUTPUT_DIR should be a directory path.
-        Predictions will be saved in separate .csv or .parquet files within this directory.
-        If multiple models are used, separate output files will be created for each model,
-        adding a suffix with the model name to the specified OUTPUT_DIR path.
+    ### Output directory format
+
+    `OUTPUT_DIR` must be a directory path. Evaluation results, metrics, and plots
+    are written to this directory.
+
+    When multiple models are evaluated, output files include a suffix indicating
+    the corresponding model.
     """
     import slideflow as sf
 
@@ -919,7 +1126,12 @@ def evaluate(
         vlog(f"Error: {e}", LogLevel.ERROR)
         return
 
-@AutoMIL.command("create-split", context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
+@AutoMIL.command(
+    "create-split",
+    context_settings=CONTEXT_SETTINGS,
+    no_args_is_help=True,
+    help=CREATE_SPLIT_HELP
+)
 @click.argument("slide_dir",        type=click.Path(exists=True, file_okay=False))
 @click.argument("annotation_file",  type=click.Path(exists=True, file_okay=True))
 @click.option(
@@ -938,30 +1150,56 @@ def create_split(
     verbose:         bool
 ):
     """
-    Create a train-test split .json file based on the provided annotations.
+    Create a train–test split file from dataset annotations.
 
-    \b
-    `create-split` reads the annotation file and generates a train-test split,
-    saving it to OUTPUT_FILE in .json format.
+    This command reads the provided annotation file and generates a train–test
+    split, which is saved as a JSON file. The resulting split can be reused
+    for reproducible training and evaluation.
 
-    \b
-    ARGUMENTS:
-      SLIDE_DIR        Directory containing whole slide images (.svs, .tiff, etc.)
-      ANNOTATION_FILE  .csv file with slide/patient annotations and labels  
+    Args:
+        slide_dir (str | Path):
+            Directory containing whole-slide images.
 
-    \b
-    EXAMPLES:
-      # Basic usage with default settings
-      automil create-split /data/slides /data/annotations.csv -o split.json
+        annotation_file (str | Path):
+            CSV file containing slide- or patient-level annotations and labels.
 
-    \b
-    OUTPUT FILE FORMAT:
-      The output JSON file will have the following structure:
+        output_file (str | Path):
+            Path to which the split JSON file will be written.
+
+        test_fraction (float):
+            Fraction of samples to assign to the test set.
+
+        read_only (bool):
+            If enabled, an existing split file will not be overwritten.
+
+        verbose (bool):
+            Enables verbose logging output.
+
+    ### Examples
+
+    Create a split with default settings:
+
+        automil create-split /data/slides /data/annotations.csv -o split.json
+
+    Create a split without overwriting an existing file:
+
+        automil create-split /data/slides /data/annotations.csv -o split.json --read-only
+
+    ### Output file format
+
+    The output JSON file contains slide identifiers grouped by split name.
+
+    Example structure:
+
         {
-          "train": ["slide1", "slide2", ...],
-          "test":  ["slide3", "slide4", ...]
+        "train": ["slide1", "slide2", ...],
+        "test":  ["slide3", "slide4", ...]
         }
+
+    Depending on the configuration, a `validation` split may be generated
+    instead of or in addition to a `test` split.
     """
+
     import slideflow as sf
 
     from .util import INFO_CLR, LogLevel, get_vlog

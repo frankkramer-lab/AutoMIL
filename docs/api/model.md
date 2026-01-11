@@ -1,0 +1,3 @@
+# ModelManager
+
+::: automil.model.ModelManager
