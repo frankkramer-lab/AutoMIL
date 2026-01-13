@@ -1,3 +1,4 @@
+import os
 from unittest.mock import MagicMock
 
 import pytest
@@ -49,3 +50,8 @@ def mock_sf_dataset():
     dataset.annotations = None
     dataset.get_bags.return_value = []
     return dataset
+
+@pytest.fixture(autouse=True)
+def clear_backend_env():
+    yield
+    os.environ.pop("SF_SLIDE_BACKEND", None)
