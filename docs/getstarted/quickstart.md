@@ -8,17 +8,9 @@ This guide walks you through a minimal, end-to-end AutoMIL workflow: from prepar
 
 If you installed AutoMIL in a virtual environment, ensure your venv is activated before running AutoMIL.
 
-=== "Bash (Linux / macOS)"
-
-    ```bash
-    source .venv/bin/activate
-    ```
-
-=== "PowerShell (Windows)"
-
-    ```powershell
-    .\.venv\Scripts\Activate.ps1
-    ```
+```bash
+source .venv/bin/activate
+```
 
 ---
 

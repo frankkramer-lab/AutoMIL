@@ -29,17 +29,9 @@ pip install .
 
     Activate the virtual environment:
 
-    === "Bash (Linux/macOS)"
-
-        ```bash
-        source .venv/bin/activate
-        ```
-
-    === "PowerShell (Windows)"
-
-        ```powershell
-        ./venv/Scripts/Activate.ps1
-        ```
+    ```bash
+    source .venv/bin/activate
+    ```
 
     Then install AutoMIL:
 
@@ -57,17 +49,8 @@ automil -h
 
 You can also check the installation path with:
 
-=== "Bash (Linux / macOS)"
+```bash
+which automil
+```
 
-    ```bash
-    which automil
-    ```
-
-=== "PowerShell (Windows)"
-
-    ```powershell
-    Get-Command automil
-    ```
-
-
-If the command resolves to a path or a command registry entry, the installation was successful
+If the command resolves to a path, the installation was successful
