@@ -32,7 +32,8 @@ def is_ome_tiff(file_path: Path) -> bool:
     Returns:
         bool: Whether `file_path` is an OME-TIFF file
     """
-    return file_path.suffix.lower() in {".ome.tif", ".ome.tiff"}
+    suffixes = [suffix.lower() for suffix in file_path.suffixes]
+    return suffixes in ([".ome", ".tiff"], [".ome", ".tif"])
 
 def has_png_slides(slide_dir: Path) -> bool:
     """Checks if the given slide directory contains any .png slides
@@ -74,14 +75,11 @@ def configure_image_backend(
         bool: Whether PNG -> TIFF conversion is needed
     """
     vlog = get_vlog(verbose)
-    system = platform.system().lower()
 
-    system_is_windows = system == "windows"
     ome_tiff_present = any(is_ome_tiff(p) for p in slide_dir.iterdir())
 
     requires_libvips = (
-        system_is_windows
-        or needs_png_conversion
+        needs_png_conversion
         or ome_tiff_present
     )
 
@@ -92,8 +90,6 @@ def configure_image_backend(
     if not libvips_available():
 
         error_message = ""
-        if system_is_windows:
-            error_message += "- Operating system is Windows\n"
         if needs_png_conversion:
             error_message += "- PNG slides detected (requires PNG -> TIFF conversion)\n"
         if ome_tiff_present:
