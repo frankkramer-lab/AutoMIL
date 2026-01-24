@@ -17,3 +17,5 @@ split.json
 project_*
 model_test/
 dist/
+.pypirc
+results/

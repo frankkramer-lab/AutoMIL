@@ -33,7 +33,6 @@ def get_unique_labels(annotations_file: Path, label_column: str) -> list[str]:
     annotations = pd.read_csv(annotations_file)
     return [str(label) for label in annotations[label_column].dropna().unique()]
 
-
 class Dataset():
     """Prepares and manages slideflow dataset sources for use in the AutoMIL pipeline.
 
@@ -232,13 +231,15 @@ class Dataset():
 
             if ann_type != unique_type:
                 unique_labels = [ann_type(lbl) for lbl in unique_labels]
+        
+        self.vlog(f"Filtering for unique labels {unique_labels}")
 
         return self.project.dataset(
             dataset.tile_px,
             dataset.tile_um,
             filters={"label": unique_labels},
         )
-    
+        
     def _convert_pretiled(self) -> sf.Dataset:
         """Converts a pretiled dataset source to tfrecords. Tiling is skipped.
 

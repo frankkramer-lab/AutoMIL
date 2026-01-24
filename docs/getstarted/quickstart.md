@@ -88,7 +88,7 @@ INFO     Preparing dataset source at resolution Low (1000px,
         2000.00um)        
 ```
 
-The trained model will be saved in the `/results` directory under `results/models/`.
+The trained model will be saved in the `results/` directory under `results/models/`.
 
 ## 4. Evaluate the trained model
 

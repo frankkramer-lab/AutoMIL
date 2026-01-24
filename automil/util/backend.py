@@ -46,7 +46,6 @@ def has_png_slides(slide_dir: Path) -> bool:
     """
     return any(p.suffix.lower() == ".png" for p in slide_dir.iterdir())
 
-
 def configure_image_backend(
     slide_dir: Path,
     *,
@@ -59,7 +58,6 @@ def configure_image_backend(
     However, cucim is not available on Windows, and has limited support for certain file formats (e.g. PNG, OME-TIFF).
 
     In the following cases, the backend is configured to use libvips instead:
-    - The operating system is Windows
     - The slide directory contains any PNG slides | TIFF conversion is needed
     - The slide directory contains any OME-TIFF slides (which cucim does not support)   
 
@@ -76,9 +74,11 @@ def configure_image_backend(
     """
     vlog = get_vlog(verbose)
 
+    # Edge Case 1: OME-TIFF files present
     ome_tiff_present = any(is_ome_tiff(p) for p in slide_dir.iterdir())
 
     requires_libvips = (
+        # Edge Case 2: User chooses tiff->png conversion
         needs_png_conversion
         or ome_tiff_present
     )

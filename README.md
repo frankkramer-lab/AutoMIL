@@ -1,119 +1,91 @@
 # AutoMIL 
 ## Automated Machine Learning for Image Classification in Whole-Slide Imaging with Multiple Instance Learning
 
-AutoMIL provides a flexible framework for training and evaluating Multiple Instance Learning models for the task of image classification on Whole Slide Image (WSI) datasets.
+AutoMIL is a flexible, open-source, end-to-end pipeline for training and evaluating Multiple Instance Learning (MIL) models for image classification on whole-slide images (WSIs).
+It provides a modular command-line interface (CLI) that enables straightforward usage and adaptation to diverse WSI datasets.
+In addition to the CLI, AutoMIL exposes a Python API for programmatic use, allowing users to build their own custom workflows.
 
-![Pipeline Overview](images/pipeline.png)
 
 ## Features
 
-- **Automated Pipeline**: Complete automated workflow encompassing preprocessing, training and evalutuation
-- **Image Backend Compatibility**: Support for multiple common image backends (cucim, libvips, openslide) available on both Linux and Windows
-- **Memory Optimization**: Automated adjustments of hyperparamters to better adaptat to available VRAM
-- **Rich Logging**: Extensive logging and debug functionality with color-coding using [Rich](https://rich.readthedocs.io/en/stable/introduction.html)
-- **Configuration**: Support for various slide formats and annotation strucutures
+* A well documented and easy to use Command Line Interface
+* A high-level python API for custom development
+* Modular project structure for easy adaptation to new datasets
+* Support for multiple MIL algorithms and model architectures
+* Adaptability to various WSI formats and datasets, including large image sizes and pretiled slides
 
 ## Installation
 
 ### Requirements
-- Python 3.11+
-- Cuda-compatible GPU
-- libvips (Windows) or cucim (Linux)
+    - Python 3.11+
+    - Cuda-compatible GPU
+    - cucim or libvips
+    - Linux
 
 ### Setup
 
-#### [pip](https://pypi.org/project/pip/)
+**AutoMIL** can be installed directly from its public [GitHub](https://github.com/your/project) repository. To download the source code, open a terminal, navigate to any directory and run:
+
 ```bash
-git clone https://github.com/your-repo/AutoMIL.git
-cd AutoMIL
-pip install -r requirements.txt
+git clone https://github.com/WaibelJonas/AutoMIL.git
 ```
-#### [uv](https://docs.astral.sh/uv/)
+
+This will clone the projects source code inside a new directory called `./automil`. Navigate to this directory and install **AutoMIL** in your current python environment:
+
 ```bash
-git clone https://github.com/your-repo/AutoMIL.git
-cd AutoMIL
-uv sync
-# Activate the virtual environment
-source .venv/bin/activate  # Linux/macOS
-# or
-.venv\Scripts\activate     # Windows
+pip install .
 ```
 
 ## Quick Start
 
-### Basic Pipeline
-Run the complete AutoMIL training pipeline:
+### Preparing your Dataset
+
+AutoMIL expects your WSI dataset to consist of slide images in one of many supported formats (.tiff, .svs, .tif etc) and a file containing slide-level label information 
+
+A minimal dataset consists of:
+
+- A directory containing slide images
+- A .csv metadata file with slide-level annotations
+
+Example directory structure:
+
+```text
+dataset/
+├── slides/
+│   ├── case_001.tiff
+│   ├── case_002.tiff
+│   └── case_003.tiff
+└── annotations.csv
+```
+
+With annotations.csv:
+
+```csv
+patient,slide,label
+001,case_001,0
+002,case_002,0
+003,case_003,1
+```
+
+### Training a Model
+
+To train a basic [Attention_MIL](https://arxiv.org/abs/1802.04712) model on the dataset, run the `automil train` command with default parameters:
 
 ```bash
-cd AutoMIL
-source .venv/bin/activate
-python3 src/cli.py run-pipeline ./slides ./annotations.csv ./project_dir --verbose
+automil train ./dataset/slides ./dataset/annotations.csv results -v
 ```
 
-**Options:**
-- `-pc, --patient_column`: Column name for patient IDs (default: "patient")
-- `-lc, --label_column`: Column name for labels (default: "label")
-- `-sc, --slide_column`: Column name for slide names (optional)
-- `-k`: Number of cross-validation folds (default: 3)
-- `-t, --transform_labels`: Transform labels to float values
-- `-v, --verbose`: Enable detailed logging
-- `-c, --cleanup`: Delete project structure after completion
+Using the verbose flag `-v` will provide you with additional information displayed in stdout, giving you more verbose info and error messages and is recommended
 
-### Batch Size Analysis
-Analyze model performance across different batch sizes:
+The trained model will be saved in the `results/` directory under `results/models/`.
+
+
+### Evaluate the trained model
+
+To evaluate the trained model on the same dataset, run the `automil evaluate` command:
 
 ```bash
-cd AutoMIL
-source .venv/bin/activate
-python3 src/cli.py batch-analysis ./slides ./annotations.csv ./project_dir --batch_sizes "2,4,8,16,32" --plot --verbose
+automil evaluate ./results/models/00000_attentionmil_label/ ./dataset/slides ./dataset/annotations.csv -o ./evaluation -v
 ```
 
-**Options:**
-- All options from `run-pipeline`
-- `-bs, --batch_sizes`: Comma-separated batch sizes (default: "2,4,8,16,32")
-- `-p, --plot`: Generate plots automatically after analysis
-
-## Expected Dataset Structure
-
-AutoMIL expects datasets to be organized in a specific structure depending on the type of dataset being used (WSI dataset or pretiled image dataset).
-
-### Whole Slide Image Dataset (Default)
-
-When working with WSI's, provide the following paths to the `run-pipeline` or `batch-analysis` commands:
-
-- **Slides Directory:** A directory containing all WSI files (e.g., `.svs`, `.tiff`, etc.) | CLI Argument: **SLIDES_DIR** \
-**NOTE**: If slides come in the .png format, a preprocessing step is performed to convert them to .tiff files for compatibility.
-
-- **Annotations File:** a .csv containing associated patient and slide IDs along with their labels | CLI Argument: **ANNOTATIONS_FILE** \
-    At minimum, the .csv file should contain the following columns:
-    - Patient ID column (default name: "patient", configurable via `-pc, --patient_column`)
-    - Label column (default name: "label", configurable via `-lc, --label_column`)
-    A minimal annotations file could look like this:
-    ```
-    patient,label
-    P001,0
-    P002,1
-    P003,0
-    P004,1
-    ```
-
-- **Project Directory:** A directory where any intermediate files and results will be stored | CLI Argument: **PROJECT_DIR** \
-The project directory will be created if it does not already exist.
-
-### Pretiled Image Dataset
-
-If you are working with a pretiled dataset, make sure that your **Slide Directory** is structured as follows:
-
-- Each slide should have its own subdirectory within the main slides directory.
-- Each subdirectory should contain the image tiles corresponding to that slide.
-For example:
-```
-slides/
-    slide_001/
-        tile_001.png
-        tile_002.png
-        ...
-    slide_002/
-        tile_001.png
-        tile_002.png
-```
+This will create an evaluation report inside the `./evaluation` directory, containing metrics and visualizations of the model performance.
