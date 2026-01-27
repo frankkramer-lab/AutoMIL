@@ -11,9 +11,9 @@ from typing import Iterable
 import pandas as pd
 import slideflow as sf
 from slideflow.util import is_project
-from tabulate import tabulate
 
 from .util import INFO_CLR, SUCCESS_CLR, get_vlog
+from .util.logging import render_kv_table
 
 
 # === Helpers === #
@@ -163,27 +163,9 @@ class Project:
         return self.project
     
     def summary(self) -> None:
-        """Prints a simple summary of the Project Instance in a tabular format
-
-        Example:
-            ```
-            ╒═══════════════════════╤═══════════════════════════════╕                                                                                                                                                                       
-            │ Project Directory:    │ project                       │                                                                                                                                                                       
-            │ Slide Directory:      │ data/slides                   │                                                                                                                                                                       
-            │ Annotations File:     │ data/annotations.csv          │                                                                                                                                                                       
-            │ Patient Column:       │ patient                       │                                                                                                                                                                       
-            │ Label Column:         │ label                         │                                                                                                                                                                       
-            │ Slide Column:         │ slide                         │                                                                                                                                                                       
-            │ Transform Labels:     │ False                         │                                                                                                                                                                       
-            │ Modified Annotations: │ data/annotations.csv          │                                                                                                                                                                       
-            │ Slideflow Project:    │ Loaded                        │                                                                                                                                                                       
-            ╘═══════════════════════╧═══════════════════════════════╛
-            ```   
-        """
+        """Prints a simple summary of the Project Instance in a tabular format"""
         vlog = self.vlog
-
-        vlog("[bold underline]Project Summary[/]")
-        table = [
+        rows = [
             ("Project Directory:", str(self.project_dir)),
             ("Slide Directory:", str(self.slide_dir)),
             ("Annotations File:", str(self.annotations_file)),
@@ -194,7 +176,10 @@ class Project:
             ("Modified Annotations:", str(self.modified_annotations_file) or "Not yet created"),
             ("Slideflow Project:", "Loaded" if self.project else "Not initialized"),
         ]
-        vlog(tabulate(table, tablefmt="fancy_outline"))
+
+
+        vlog("[bold underline]Project Summary[/]")
+        vlog(render_kv_table(rows, width=256))
 
     # === Internals === #
     def _setup_project_folder(self) -> None:

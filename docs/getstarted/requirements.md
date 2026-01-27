@@ -71,7 +71,7 @@ pip install .[vips]
 
 !!! warning "System dependency required for pyvips"
 
-    `pyvips` is only the Python binding for the image processing library
+   `pyvips` is only the Python binding for the image processing library
     [libvips](https://www.libvips.org/), which must be installed separately
     on your system.
     

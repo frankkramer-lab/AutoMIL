@@ -10,10 +10,10 @@ import pandas as pd
 import slideflow as sf
 import torch
 from slideflow.slide import qc
-from tabulate import tabulate
 
 from .util import (COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR,
                    RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel, get_vlog)
+from .util.logging import render_kv_table
 from .util.pretiled import pretiled_to_tfrecords
 from .util.slide import calculate_average_mpp, get_mpp_from_slide
 from .util.tiff_conversion import batch_conversion_concurrent, batch_generator
@@ -138,34 +138,18 @@ class Dataset():
         return dataset
     
     def summary(self) -> None:
-        """Prints a summary of the dataset
-
-        Example:
-            ```
-            ╒═══════════════════╤═══════════╕                                                                                                                                                                                               
-            │ Resolution Preset │ Low       │                                                                                                                                                                                               
-            │ Tile Size (px)    │ 1000px    │                                                                                                                                                                                               
-            │ Magnification     │ 10xx      │                                                                                                                                                                                               
-            │ Microns-Per-Pixel │ 1.000um   │                                                                                                                                                                                               
-            │ Tile Size (um)    │ 1000.00um │                                                                                                                                                                                               
-            │ Pretiled Input    │ False     │                                                                                                                                                                                               
-            │ TIFF Conversion   │ True      │                                                                                                                                                                                               
-            ╘═══════════════════╧═══════════╛ 
-            ```
-        """
-        vlog = self.vlog
-
-        table = [
+        rows = [
             ("Resolution Preset", self.resolution.name),
-            ("Tile Size (px)",    f"{self.tile_px}px"),
-            ("Magnification",     f"{self.magnification}"),
+            ("Tile Size (px)", f"{self.tile_px}px"),
+            ("Magnification", self.magnification),
             ("Microns-Per-Pixel", f"{self.mpp:.3f}"),
-            ("Tile Size (um)",    f"{self.tile_um:.2f}um"),
-            ("Pretiled Input",    f"{self.is_pretiled}"),
-            ("TIFF Conversion",   f"{self.tiff_conversion}"),
+            ("Tile Size (µm)", f"{self.tile_um:.2f}µm"),
+            ("Pretiled Input", self.is_pretiled),
+            ("TIFF Conversion", self.tiff_conversion),
         ]
-        vlog(f"[bold underline]Dataset Summary:[/]")
-        vlog(tabulate(table, tablefmt="fancy_outline"))
+
+        self.vlog("[bold underline]Dataset Summary[/]")
+        self.vlog(render_kv_table(rows))
 
     # === Internals === #
     def _compute_mpp(self, by_average: bool = True) -> float:

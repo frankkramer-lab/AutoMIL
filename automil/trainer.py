@@ -9,7 +9,6 @@ from typing import cast
 import pandas as pd
 import slideflow as sf
 import torch
-import torch.nn as nn
 from fastai.callback.core import Callback
 from fastai.callback.tracker import EarlyStoppingCallback
 from fastai.learner import Learner
@@ -24,6 +23,7 @@ from .model import ModelManager
 from .util import (BATCH_SIZE, EPOCHS, INFO_CLR, LEARNING_RATE, ModelType,
                    get_vlog)
 from .util.bags import get_bag_avg_and_num_features
+from .util.logging import render_kv_table
 from .util.slide import get_num_slides
 
 
@@ -299,30 +299,7 @@ class Trainer:
         return learners
 
     def summary(self) -> None:
-        """Print a summary of the trainer configuration
-        
-        Example:
-            ```
-            ╒═════════════════════════╤═══════════════╕                 
-            │ Model Type              │ attention_mil │                 
-            │ Learning Rate           │ 1e-04         │                 
-            │ Epochs                  │ 300           │                 
-            │ Initial Batch Size      │ 32            │                 
-            │ Adjusted Batch Size     │ 100           │                 
-            │ Estimated Model Size    │ 400.48 MB     │                 
-            │ Actual Inference Memory │ 300.29 MB     │                 
-            │ Number of Slides        │ 341           │                 
-            │ Average Bag Size        │ 654           │                 
-            │ Feature Dimensions      │ 768           │                 
-            │ K-Fold                  │ 3             │                 
-            │ Early Stopping          │ True          │                 
-            │ Attention Heatmaps      │ True          │                 
-            │ Device                  │ cuda          │                 
-            ╘═════════════════════════╧═══════════════╛    
-            ```
-        """
-        from tabulate import tabulate
-
+        """Print a summary of the trainer configuration"""
         # Safe way to handle actual memory attribute
         # Since it may not have been set yet (Only after training)
         actual_mem_mb = getattr(self, 'actual_mem_mb', None)
@@ -331,7 +308,7 @@ class Trainer:
         else:
             actual_mem_str = "N/A"
 
-        table = [
+        rows = [
             ("Model Type", self.model.model_name),
             ("Learning Rate", f"{self.lr:.0e}"),
             ("Epochs", self.epochs),
@@ -349,7 +326,7 @@ class Trainer:
         ]
         
         self.vlog("[bold underline]Trainer Summary:[/]")
-        self.vlog(tabulate(table, tablefmt="fancy_outline"))
+        self.vlog(render_kv_table(rows))
 
     # === Internals === #
     def _debug_dataset_labels(self) -> None:
