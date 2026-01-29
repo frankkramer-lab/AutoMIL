@@ -1,6 +1,11 @@
 """
-Module for ``automil.Project``, which assists with setting up and managing an AutoMIL project.
+Project management utilities for AutoMIL.
+
+This module provides the :class:`automil.project.Project` class, which is
+responsible for initializing, validating, and managing an AutoMIL project
+along with an underlying Slideflow project instance.
 """
+
 
 from __future__ import annotations
 
@@ -44,12 +49,18 @@ def contains_columns(data: pd.DataFrame | Path, columns: Iterable[str], return_m
 
 class Project:
     """
-    Assists with setting up and managing a slideflow project instance.
+    Manages the setup of an AutoMIL project.
 
-    Given a directory for the project, an annotations file, and a slide directory,
-    this class sets up the necessary project structure, modifies the annotations file to conform to Slideflow's expected format,
-    and creates or loads a Slideflow project instance.
+    The Project class is responsible for:
+        - Modifying the annotation file to conform to the expected slideflow format
+        - Creating the project directory structure
+        - Creating or loading a Slideflow project instance
+        - Exposing project attributes to downstream processes
+
+    A Project instance must be prepared before training, evaluation,
+    or prediction can be performed.
     """
+
     def __init__(
         self,
         project_dir: Path | str,
@@ -62,6 +73,9 @@ class Project:
         verbose: bool = True
     ) -> None:
         """Initializes a Project instance.
+
+        This metod itself does not create or modify files or directories. To prepare a directory to house
+        a project, call :meth:`prepare_project`
 
         Args:
             project_dir (Path | str): Directory in which to set up project
@@ -88,7 +102,17 @@ class Project:
     # === Properties === #
     @cached_property
     def required_columns(self) -> set[str]:
-        """Required columns for annotations file"""
+        """
+        Set of required columns expected in the annotation file.
+
+        Includes:
+            - Patient identifier column
+            - Label column
+            - Slide identifier column (if provided)
+
+        Returns:
+            Set of required columns
+        """
         required = {self.patient_column, self.label_column}
         if self.slide_column:
             required.add(self.slide_column)
@@ -97,13 +121,17 @@ class Project:
     @property
     def label_map(self) -> dict | list[str]:
         """
-        Label mapping created during annotations setup.
-        
+        Mapping between original labels and model-ready labels.
+
+        The mapping is created during project scaffold setup.
+
         Returns:
-            dict | list[str]: The label map (dict if transform_labels=True, else list of unique labels).
-            
+            dict:
+                Mapping from label to float if ``transform_labels=True`` or a list of unique labels otherwise.
+
         Raises:
-            AttributeError: If the label map has not been set up yet. Call setup_project_scaffold() first.
+            AttributeError:
+                If the project scaffold has not been set up yet.
         """
         if not hasattr(self, '_label_map'):
             raise AttributeError(
@@ -116,7 +144,7 @@ class Project:
         """List of unique slide identifiers from the modified annotations file.
 
         Returns:
-            list[str]: List of unique slide IDs.
+            List of unique slide IDs.
         """
         if not hasattr(self, 'modified_annotations'):
             raise AttributeError(
@@ -126,7 +154,14 @@ class Project:
 
     # === Public Methods === #
     def setup_project_scaffold(self) -> None:
-        """Sets up the project directory structure and modifies annotations file."""
+        """
+        Creates the project directory and normalizes annotations.
+
+        This method:
+            - Creates the project directory if it does not exist
+            - Normalizes the annotation file to Slideflow format
+            - Generates and stores the label mapping
+        """
         self._setup_project_folder()
         self.modified_annotations = self._setup_annotations()
         self._label_map = self._setup_label_map()
@@ -183,7 +218,11 @@ class Project:
 
     # === Internals === #
     def _setup_project_folder(self) -> None:
-        """Creates the project directory if it does not exist."""
+        """
+        Ensures the project directory exists.
+
+        Creates the directory and parent directories if necessary.
+        """
         if not self.project_dir.exists():
             self.project_dir.mkdir(parents=True, exist_ok=True)
             self.vlog(f"Created project directory at [{INFO_CLR}]{self.project_dir}[/]")
@@ -192,7 +231,7 @@ class Project:
 
     def _setup_annotations(self) -> pd.DataFrame:
         """
-        Normalize the input annotations file to the required format and set up label map.
+        Normalizes the input annotations file to the required format and set up label map.
 
         This includes:
             - Validating the presence of required columns.

@@ -1,6 +1,15 @@
 """
-Module for ``automil.Dataset``, which manages dataset sources for the AutoMIL pipeline.
+Dataset management utilities for AutoMIL.
+
+This module provides the :class:`automil.dataset.Dataset` class, which is responsible for preparing a
+slideflow-compatible dataset source that can be passed to downstream pipeline stages.
+It supports both raw and pre-tiled whole-slide image datasets, and handles
+tiling, the conversion from .png to .tiff, label filtering, and feature extraction.
+
+The resulting datasets are stored as TFRecords and feature bags within respective folders in the
+project directory.
 """
+
 from __future__ import annotations
 
 from functools import cached_property
@@ -34,9 +43,18 @@ def get_unique_labels(annotations_file: Path, label_column: str) -> list[str]:
     return [str(label) for label in annotations[label_column].dropna().unique()]
 
 class Dataset():
-    """Prepares and manages slideflow dataset sources for use in the AutoMIL pipeline.
+    """Prepares and manages dataset sources for downstream pipeline stages.
 
-    Supports both raw slide directories as well as pretiled slide datasets.
+    This class handles and executes all dataset-related preprocessing steps, including:
+
+    - Computing microns-per-pixel (MPP) or selecting a sensible default
+    - Filtering slides by label
+    - Extracting tiles or
+    - Handling pretiled datasets
+    - Generating feature bags for model training
+
+    The dataset lifecycle is tightly coupled to a slideflow ``Project`` instance
+    and produces TFRecords and feature bags within the project directory.
     """
     def __init__(
         self,
@@ -49,11 +67,17 @@ class Dataset():
         tiff_conversion: bool = False,
         verbose: bool = True
         ) -> None:
-        """Initializes the Dataset manager.
+        """Initialize a Dataset manager.
 
         Args:
-            project (sf.Project): Project for which to manage dataset sources
-            verbose (bool, optional): Whether to print verbose messages. Defaults to True.
+            project (sf.Project): Slideflow project associated with this dataset.
+            resolution (RESOLUTION_PRESETS): Resolution preset defining tile size and magnification.
+            label_map (dict | list[str]): Label mapping used to filter slides.
+            slide_dir (Path | None, optional): Directory containing raw or pretiled slides.
+            bags_dir (Path | None, optional): Output directory for generated feature bags.
+            is_pretiled (bool, optional): Whether the input slides are already tiled.
+            tiff_conversion (bool, optional): Whether slides should be converted to TIFF before tiling.
+            verbose (bool, optional): Enable verbose logging.
         """
         self.project = project
         self.resolution = resolution
@@ -69,22 +93,43 @@ class Dataset():
 
     @cached_property
     def tile_px(self) -> int:
-        """Tile size in pixels from resolution preset"""
+        """Tile size in pixels derived from the resolution preset.
+
+        Returns:
+            int: Tile size in pixels.
+        """
         return self.resolution.tile_px
     
     @cached_property
     def magnification(self) -> str:
-        """Magnification from resolution preset"""
+        """Nominal magnification derived from the resolution preset.
+
+        Returns:
+            str: Magnification string (e.g., ``"10x"``).
+        """
+
         return self.resolution.magnification
     
     @cached_property
     def mpp(self) -> float:
-        """Computed microns-per-pixel value"""
+        """Computed microns-per-pixel (MPP) value.
+
+        The MPP is computed by retrieving MPP values from the slides metadata ifavailable, otherwise
+        sensible defaults are used based on magnification.
+
+        Returns:
+            float: Microns per pixel.
+        """
         return self._compute_mpp(by_average=True)
-    
+
     @cached_property
     def tile_um(self) -> int:
-        """Tile size in micrometers"""
+        """Tile size in micrometers.
+
+        Returns:
+            int: Tile size in micrometers.
+        """
+
         return int(self.tile_px * self.mpp)
 
     @cached_property

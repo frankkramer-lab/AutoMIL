@@ -1,6 +1,6 @@
 # Requirements
 
-This section outlines the software and system requirements needed to run **AutoMIL**.
+This section outlines the software and system requirements needed to run AutoMIL.
 
 ---
 
@@ -63,7 +63,7 @@ By default, Slideflow uses the image processing library :material-github: [cuCIM
 2. **Using AutoMIL’s PNG → TIFF conversion pipeline**  
    For PNG-based datasets (which are generally not recommended for WSIs, but are [sometimes used in practice](https://www.kaggle.com/competitions/UBC-OCEAN/)), AutoMIL provides an opt-in preprocessing step to convert PNG images to TIFF. cuCIM is not well suited for processing very large PNG images in this context.
 
-For both cases, **AutoMIL** provides an optional dependency group that installs the [pyvips](https://github.com/libvips/pyvips) library as an alternative image processing backend. Install it via:
+For both cases, AutoMIL provides an optional dependency group that installs the [pyvips](https://github.com/libvips/pyvips) library as an alternative image processing backend. Install it via:
 
 ```bash
 pip install .[vips]
@@ -71,10 +71,10 @@ pip install .[vips]
 
 !!! warning "System dependency required for pyvips"
 
-   `pyvips` is only the Python binding for the image processing library
-    [libvips](https://www.libvips.org/), which must be installed separately
-    on your system.
-    
-    ```bash
-    sudo apt install libvips
-    ```
+      `pyvips` is only the Python binding for the image processing library
+      [libvips](https://www.libvips.org/), which must be installed separately
+      on your system.
+      
+      ```bash
+      sudo apt install libvips
+      ```

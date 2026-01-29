@@ -187,10 +187,18 @@ INFO     Saved plot 'roc_curves' to
 This will create an evaluation report inside the `./results/evaluation` directory, containing metrics and plots of the model performance:
 
 ![Model Comparison](../assets/model_comparison.png)
+///caption
+Metric Comparison across all models
+///
 
 ![Per Class Accuracy](../assets/per_class_accuracy.png)
+///caption
+Per Class Accuracy scores across all model
+///
 
 ![ROC Curves](../assets/roc_curves.png)
-
+///caption
+The ROC curves for all models
+///
 
 

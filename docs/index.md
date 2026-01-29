@@ -9,7 +9,7 @@ In addition to the CLI, AutoMIL exposes a Python API for programmatic use, allow
 
 ??? info "AutoMIL and AutoML"
 
-    **AutoMIL** is deeply rooted in the research field of [AutoML](https://www.automl.org/automl/), focusing on methods and processes to automate the development and deployment of Machine Learning (ML) solutions in order to make them more accessible to the broader public domain without requiring expert knowledge. AutoMIL is the first project of this type for WSI data and Histopathology (to our knowledge)
+    **AutoMIL** is deeply rooted in the research field of [AutoML](https://www.automl.org/automl/), focusing on methods and processes to automate the development and deployment of Machine Learning (ML) solutions in order to make them more accessible to the broader public domain without requiring expert knowledge.
 
 ![Pipeline Graph](./assets/Pipeline_Graph.png)
 

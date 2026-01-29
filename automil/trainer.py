@@ -1,4 +1,10 @@
-"""Module for ``automil.Trainer``, which handles MIL model training with automatic batch size optimization and early stopping."""
+"""
+Training utilities for AutoMIL.
+
+This module provides the  :class:`automil.trainer.Trainer`, which orchestrates training MIL models
+using Slideflow and FastAI. It provides automatic batch size adjustment based on GPU memory constraints, optional early stopping
+and k-fold cross-validation with the ability of providing additional callbacks
+"""
 from __future__ import annotations
 
 from functools import cached_property
@@ -28,7 +34,14 @@ from .util.slide import get_num_slides
 
 
 class Trainer:
-    """Handles MIL model training with automatic batch size optimization and early stopping"""
+    """
+    Orchestrates MIL model training and evaluation.
+
+    Trainer wraps the entire training workflow and provides a couple of related functionalities:
+        - Automatic batch size optimization based on VRAM usage
+        - Early stopping (via FastAI callback `EarlyStoppingCallback`)
+        - Optional k-fold cross-validation
+    """
     
     def __init__(
         self,
@@ -104,6 +117,7 @@ class Trainer:
 
     @cached_property
     def num_classes(self) -> int:
+        """Number of target classes derived from dataset annotations"""
         if self.train_dataset.annotations is not None:
             return self.train_dataset.annotations["label"].nunique()
         elif self.val_dataset.annotations is not None:
@@ -156,19 +170,24 @@ class Trainer:
         self,
         model_label_override: str | None = None,
     ) -> Learner:
-        """Fit a model of type `self.model` to `train_dataset` using `val_dataset` for validation.
+        """
+        Trains a single MIL model.
 
-        Note:
-            This method closely emulates the internal training workflow of Slideflow's `slideflow.mil._train_mil_mode` method,
-            With modifications that allow the passing of custom callbacks in order to enable early stopping,
-            additional type safety checks and additonal logging functionality.
+        This method performs model training and validation.
+
+        ??? Note
+            This method closely mirrors Slideflow's internal training workflow (see `slideflow.mil._train_mil_mode`),
+            but extends the routine with additional functionalities such as passing callbacks to enable early stopping,
+            more type safety checks and additional logging, amongst others
 
         Args:
-            model_label_override (str | None, optional): String override for the directory name in which the model will be saved. If None
-            slideflows default naming sheme will be used ('{index}_{model_type}_{label_column}'). Defaults to None.
+            model_label_override (str | None, optional):
+                Custom directory name for the trained model. If ``None``, Slideflow's
+                default naming scheme is used.
 
         Returns:
-            Learner: FastAI Learner object containing the trained model
+            Learner:
+                Trained FastAI learner instance.
         """
         # Determine output directory
         if model_label_override:
@@ -199,7 +218,7 @@ class Trainer:
             learner = result
             n_in, n_out = 0, 0  # Shape info not available
         
-        # Save MIL parameters (like Slideflow does)
+        # Save MIL parameters
         self._log_mil_params("label", learner, n_in, n_out, str(outdir))
         
         # Add custom callbacks if needed
@@ -207,7 +226,7 @@ class Trainer:
         for callback in callbacks:
             learner.add_cb(callback)
         
-        # Train the model using Slideflow's method
+        # Train the model using fastai
         self.vlog(
             f"Starting training: {self.model.model_name} "
             f"(epochs={self.epochs}, batch_size={self.adjusted_batch_size})"
@@ -263,14 +282,18 @@ class Trainer:
         return learner
 
     def train_k_fold(self, base_model_label_override: str | None = None) -> list[Learner]:
-        """Performs k-fold training on `train_dataset`, creating and saving `self.k` trained MIL models
+        """
+        Performs k-fold cross-validation training.
+
+        Trains ``k`` independent models and stores them in separate subdirectories.
 
         Args:
-            base_model_label_override (str | None, optional): Base string override for the directory name in which the model will be saved.
-            The k-fold will be appended to the directory name. If None, slideflows default naming sheme will be used
-            ('{index}_{model_type}_{label_column}'). Defaults to None.
+            base_model_label_override (str | None, optional):
+                Base directory name for k-fold outputs.
+
         Returns:
-            list[Learner]: List of trained FastAI Learners
+            list[Learner]:
+                Trained learners, one per fold.
         """
         outdir = self.model_outdir
         if base_model_label_override:
