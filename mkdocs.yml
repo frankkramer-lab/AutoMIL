@@ -42,11 +42,12 @@ plugins:
             show_signature_annotations: true
             show_root_heading: true
             show_root_full_path: false
-            show_init: true
             show_signature: true
             separate_signature: true
             filters:
               - "!^_"
+            extra:
+              show_init: true
 
 nav:
   - Home: index.md

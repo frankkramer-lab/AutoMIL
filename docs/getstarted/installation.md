@@ -1,16 +1,16 @@
 # Installation
 
-This guide provides a quick overview of how to install **AutoMIL** on your system
+This guide provides a quick overview of how to install AutoMIL on your system
 
 ## Github
 
-**AutoMIL** can be installed directly from its public :material-github: [GitHub](https://github.com/your/project) repository. To download the source code, open a terminal, navigate to any directory and run:
+AutoMIL can be installed directly from its public :material-github: [GitHub](https://github.com/your/project) repository. To download the source code, open a terminal, navigate to any directory and run:
 
 ```bash
 git clone https://github.com/WaibelJonas/AutoMIL.git
 ```
 
-This will clone the projects source code inside a new directory called `./automil`. Navigate to this directory and install **AutoMIL** in your current python environment:
+This will clone the projects source code inside a new directory called `./automil`. Navigate to this directory and install AutoMIL in your current python environment:
 
 ```bash
 pip install .
