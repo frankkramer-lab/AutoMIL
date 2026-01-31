@@ -1,22 +1,31 @@
 name: Deploy Website
+
 on:
   push:
     branches:
       - main
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      - run: pip install \
-          black \
-          mkdocs-material \
-          griffe==0.18.0 \
-          mkdocstrings-python \
-          mkdocs-gen-files \
-          mkdocs-literate-nav \
-          mkdocs-section-index
-      - run: mkdocs gh-deploy --force
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            black \
+            mkdocs-material \
+            mkdocstrings[python] \
+            mkdocs-gen-files \
+            mkdocs-literate-nav \
+            mkdocs-section-index
+
+      - name: Deploy MkDocs
+        run: mkdocs gh-deploy --force
