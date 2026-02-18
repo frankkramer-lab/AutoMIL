@@ -5,7 +5,7 @@ It provides a modular command-line interface (CLI) that enables straightforward 
 In addition to the CLI, AutoMIL exposes a Python API for programmatic use, allowing users to build their own custom workflows.
 
 !!! info "Project Repository"
-    The full code is accessible on :material-github: [GitHub](https://github.com/your/project)
+    The full code is accessible on :material-github: [GitHub](https://github.com/frankkramer-lab/AutoMIL)
 
 ??? info "AutoMIL and AutoML"
 

@@ -5,7 +5,6 @@ AutoMIL is a flexible, open-source, end-to-end pipeline for training and evaluat
 It provides a modular command-line interface (CLI) that enables straightforward usage and adaptation to diverse WSI datasets.
 In addition to the CLI, AutoMIL exposes a Python API for programmatic use, allowing users to build their own custom workflows.
 
-
 ## Features
 
 * A well documented and easy to use Command Line Interface
@@ -13,6 +12,13 @@ In addition to the CLI, AutoMIL exposes a Python API for programmatic use, allow
 * Modular project structure for easy adaptation to new datasets
 * Support for multiple MIL algorithms and model architectures
 * Adaptability to various WSI formats and datasets, including large image sizes and pretiled slides
+
+## Resources
+
+[Website](https://frankkramer-lab.github.io/AutoMIL/)
+[Github Repository](https://github.com/frankkramer-lab/AutoMIL)
+[Installation Guide](https://frankkramer-lab.github.io/AutoMIL/getstarted/installation/)
+[Quickstart Guide](https://frankkramer-lab.github.io/AutoMIL/getstarted/quickstart/)
 
 ## Installation
 
@@ -24,10 +30,10 @@ In addition to the CLI, AutoMIL exposes a Python API for programmatic use, allow
 
 ### Setup
 
-**AutoMIL** can be installed directly from its public [GitHub](https://github.com/your/project) repository. To download the source code, open a terminal, navigate to any directory and run:
+**AutoMIL** can be installed directly from its public [GitHub](https://github.com/frankkramer-lab/AutoMIL) repository. To download the source code, open a terminal, navigate to any directory and run:
 
 ```bash
-git clone https://github.com/WaibelJonas/AutoMIL.git
+git clone https://github.com/frankkramer-lab/AutoMIL
 ```
 
 This will clone the projects source code inside a new directory called `./automil`. Navigate to this directory and install **AutoMIL** in your current python environment:

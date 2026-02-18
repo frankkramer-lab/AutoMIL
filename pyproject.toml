@@ -7,7 +7,7 @@ name = "automil"
 version = "0.1.0"
 description = "Automated Multiple Instance Learning pipeline for whole slide image analysis"
 readme = "README.md"
-license = {text = "MIT"}
+license = { file = "LICENSE.md" }
 authors = [
     {name = "Jonas", email = "Waibel.Jonas@kabelmail.de"},
 ]
@@ -32,6 +32,11 @@ dependencies = [
     "fastai>=2.7.0",
     "ipython>=8.0.0",
     "cucim>=0.3.0"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
 ]
 
 [project.optional-dependencies]

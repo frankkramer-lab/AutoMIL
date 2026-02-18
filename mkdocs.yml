@@ -2,7 +2,7 @@ site_name: AutoMIL
 site_author: Jonas Waibel
 site_description: A framework for training and evaluating Multiple Instance Learning (MIL) models on Whole Slide Images (WSIs).
 
-repo_url: https://github.com/WaibelJonas/AutoMIL/
+repo_url: https://github.com/frankkramer-lab/AutoMIL
 copyright: Copyright &copy; 2025 - 2026 Jonas Waibel
 
 theme:
