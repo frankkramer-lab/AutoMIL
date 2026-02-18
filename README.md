@@ -15,10 +15,10 @@ In addition to the CLI, AutoMIL exposes a Python API for programmatic use, allow
 
 ## Resources
 
-[Website](https://frankkramer-lab.github.io/AutoMIL/)
-[Github Repository](https://github.com/frankkramer-lab/AutoMIL)
-[Installation Guide](https://frankkramer-lab.github.io/AutoMIL/getstarted/installation/)
-[Quickstart Guide](https://frankkramer-lab.github.io/AutoMIL/getstarted/quickstart/)
+- [Website](https://frankkramer-lab.github.io/AutoMIL/)
+- [Github Repository](https://github.com/frankkramer-lab/AutoMIL)
+- [Installation Guide](https://frankkramer-lab.github.io/AutoMIL/getstarted/installation/)
+- [Quickstart Guide](https://frankkramer-lab.github.io/AutoMIL/getstarted/quickstart/)
 
 ## Installation
 
