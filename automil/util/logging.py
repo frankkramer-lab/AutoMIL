@@ -20,7 +20,8 @@
 """
 Project wide logging utilities for AutoMIL.
 """
-
+import time
+from functools import wraps
 from io import StringIO
 from typing import Callable
 
@@ -87,3 +88,16 @@ def render_kv_table(
     console.print(table)
 
     return buffer.getvalue()
+
+# === Execution time logger
+def log_execution_time(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        vlog = get_vlog(verbose=True)
+        start = time.perf_counter()
+        try:
+            return func(*args, **kwargs)
+        finally:
+            elapsed = time.perf_counter() - start
+            vlog(f"Executed {func.__qualname__} in {elapsed:.6f} seconds")
+    return wrapper

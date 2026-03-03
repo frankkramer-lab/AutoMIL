@@ -43,8 +43,11 @@ from slideflow.mil.eval import generate_attention_heatmaps
 from slideflow.mil.train import _fastai, _log_mil_params
 from slideflow.util import path_to_name
 
-from .estimator import adjust_batch_size, estimate_model_size
+from .estimator import adjust_batch_size
+from .memory import MemoryEstimator
 from .model import ModelManager
+from .resource_optimizer import ResourceOptimizer
+from .runtime import RuntimeContext
 from .util import (BATCH_SIZE, EPOCHS, INFO_CLR, LEARNING_RATE, ModelType,
                    get_vlog)
 from .util.bags import get_bag_avg_and_num_features
@@ -118,6 +121,16 @@ class Trainer:
 
         self.vlog = get_vlog(verbose)
 
+        self.vlog("=== ATTENTION ===")
+        self.vlog(
+            self.runtime.peak_memory_mb()
+        )
+        self.runtime.reset_peak_memory()
+        self.vlog(
+            self.runtime.peak_memory_mb()
+        )
+
+
         # Hyperparameter validation
         self.model_manager = ModelManager(self.model)
         suggestions = self.model_manager.validate_hyperparameters(
@@ -134,6 +147,18 @@ class Trainer:
             )
             setattr(self, suggestion, value)
 
+        self.memory_estimator = MemoryEstimator(
+            model_type=self.model,
+            runtime=self.runtime,
+            model_manager=self.model_manager,
+        )
+
+        self.resource_optimizer = ResourceOptimizer(
+            self.runtime,
+            self.memory_estimator,
+            self.model_manager
+        )
+
     @cached_property
     def num_classes(self) -> int:
         """Number of target classes derived from dataset annotations"""
@@ -146,8 +171,8 @@ class Trainer:
 
     @cached_property
     def num_slides(self) -> int:
-        """Number of slides in training and validation dataset"""
-        return get_num_slides(self.train_dataset) + get_num_slides(self.val_dataset)
+        """Number of slides in training dataset"""
+        return get_num_slides(self.train_dataset)
     
     @cached_property
     def bag_avg(self) -> int:
@@ -162,7 +187,13 @@ class Trainer:
     @cached_property
     def adjusted_batch_size(self) -> int:
         """Optimal batch size adjusted for VRAM constraints"""
-        return self._compute_optimal_batch_size()
+        return self.resource_optimizer.find_max_batch_size(
+            self.initial_batch_size,
+            self.bag_avg,
+            self.num_features,
+            self.num_classes,
+            self.num_slides
+        )
 
     @cached_property
     def estimated_size_mb(self) -> float:
@@ -175,9 +206,11 @@ class Trainer:
         return self._build_config()
 
     @cached_property
-    def device(self) -> torch.device:
-        """The device to use for training"""
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    def runtime(self) -> RuntimeContext:
+        """Runtime context for training"""
+        return RuntimeContext.auto(
+            mixed_precision=True
+        )
 
     @cached_property
     def callbacks(self) -> list[Callback]:
@@ -226,7 +259,7 @@ class Trainer:
             outcomes="label",
             bags=str(self.bags_path),
             outdir=str(outdir),
-            device=self.device,
+            device=self.runtime.device,
             return_shape=True
         )
 
@@ -244,6 +277,9 @@ class Trainer:
         callbacks = self._setup_callbacks()
         for callback in callbacks:
             learner.add_cb(callback)
+
+        # Reset peak memory stats
+        #self.runtime.reset_peak_memory()
         
         # Train the model using fastai
         self.vlog(
@@ -286,16 +322,7 @@ class Trainer:
             self.vlog("Unable to generate predictions; skipping metrics and attention export.")
 
         # Get actual memory usage during inference
-        dummy_input = self.model_manager.create_dummy_input(
-            self.adjusted_batch_size,
-            self.bag_avg,
-            self.num_features
-        )
-
-        torch.cuda.reset_peak_memory_stats()
-        with torch.no_grad():
-            _ = learner.model(*dummy_input)
-        self.actual_mem_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
+        self.actual_mem_mb = self.runtime.peak_memory_mb()
         
         self.vlog(f"Training completed: [{INFO_CLR}]{self.model.model_name}[/]")
         return learner
@@ -364,7 +391,7 @@ class Trainer:
             ("K-Fold", self.k),
             ("Early Stopping", self.enable_early_stopping),
             ("Attention Heatmaps", self.attention_heatmaps),
-            ("Device", str(self.device)),
+            ("Device", str(self.runtime.device)),
         ]
         
         self.vlog("[bold underline]Trainer Summary:[/]")
@@ -514,12 +541,11 @@ class Trainer:
         Returns:
             float: Estimated model size in MB
         """
-        return estimate_model_size(
-            model_type=self.model,
-            batch_size=self.adjusted_batch_size,
-            bag_size=self.bag_avg,
-            input_dim=self.num_features,
-            num_classes=self.num_classes
+        return self.memory_estimator.estimate_peak_memory_mb(
+            self.adjusted_batch_size,
+            self.bag_avg,
+            self.num_features,
+            self.num_classes
         )
     
     def _build_config(self) -> TrainerConfig:

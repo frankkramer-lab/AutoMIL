@@ -71,23 +71,6 @@ def test_num_classes_uses_train_dataset_annotations(
 
         assert trainer.num_classes == 3
 
-def test_num_slides_sums_up_train_and_val(mock_project):
-    """Test that Trainer.num_slides sums up slide counts from both train and val datasets."""
-
-    with (
-        patch("automil.trainer.get_num_slides", side_effect=[10, 15]),
-        patch("automil.trainer.get_bag_avg_and_num_features", return_value=(50, 512)),
-    ):
-        trainer = Trainer(
-            bags_path=Path("/fake/bags"),
-            project=mock_project,
-            train_dataset=MagicMock(),
-            val_dataset=MagicMock(),
-            model=ModelType.Attention_MIL,
-        )
-
-        assert trainer.num_slides == 25
-
 def test_bag_avg_and_num_features_are_derived(
     mock_project,
     mock_sf_dataset,
@@ -108,34 +91,6 @@ def test_bag_avg_and_num_features_are_derived(
         assert trainer.bag_avg == 123
         assert trainer.num_features == 768
 
-def test_estimated_size_mb_delegates_to_estimator(
-    mock_project,
-    mock_sf_dataset,
-):
-    with (
-        patch("automil.trainer.get_bag_avg_and_num_features", return_value=(64, 512)),
-        patch.object(Trainer, "adjusted_batch_size", new_callable=PropertyMock, return_value=16),
-        patch("automil.trainer.estimate_model_size", return_value=321.5) as mock_estimate,
-    ):
-        trainer = Trainer(
-            bags_path=Path("/fake/bags"),
-            project=mock_project,
-            train_dataset=mock_sf_dataset,
-            val_dataset=mock_sf_dataset,
-            model=ModelType.Attention_MIL,
-        )
-
-        size = trainer.estimated_size_mb
-
-        assert size == 321.5
-        mock_estimate.assert_called_once_with(
-            model_type=ModelType.Attention_MIL,
-            batch_size=16,
-            bag_size=64,
-            input_dim=512,
-            num_classes=trainer.num_classes,
-        )
-        
 def test_device_cpu_when_cuda_unavailable(
     mock_project,
     mock_sf_dataset,
@@ -152,7 +107,7 @@ def test_device_cpu_when_cuda_unavailable(
             model=ModelType.Attention_MIL,
         )
 
-        assert trainer.device.type == "cpu"
+        assert trainer.runtime.device.type == "cpu"
 
 def test_config_is_built_via_mil_config(
     mock_project,

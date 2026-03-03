@@ -409,7 +409,7 @@ class UnifiedSizeEstimator:
         return self.model_manager.create_dummy_input(
             batch_size=batch_size,
             tiles_per_bag=tiles_per_bag, 
-            input_dim=feature_dim
+            input_dim=feature_dim,
         )
 
     

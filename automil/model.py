@@ -34,6 +34,7 @@ from slideflow.mil.models.bistro.transformer import \
     Attention as BistroTransformer
 from slideflow.util import log as slideflow_log
 
+from .runtime import RuntimeContext
 from .util import MAX_BATCH_SIZE, ModelType
 
 
@@ -71,7 +72,7 @@ def create_model_instance(
                 return model_cls(dim=input_dim)
 
             case _:
-                return model_cls()
+                raise ValueError(f"Unsupported model type: {model_type}")
     except Exception as e:
         slideflow_log.error(f"Error while creating model instance: {e}")
         raise e
@@ -211,13 +212,17 @@ class ModelManager:
         try:
             return self.model_class(**model_params)
         except TypeError as e:
-            return self.model_class()
+            raise TypeError(
+                f"Failed to instantiate {self.model_class.__name__} "
+                f"with parameters {model_params}"
+            ) from e
 
     def create_dummy_input(
         self, 
         batch_size: int, 
         tiles_per_bag: int, 
-        input_dim: int
+        input_dim: int,
+        runtime: RuntimeContext
     ) -> tuple:
         """Creates an appropriate dummy input for the model
         
@@ -236,13 +241,13 @@ class ModelManager:
 
             case ModelType.Attention_MIL:
                 # Both expect a lens tensor in addition to input
-                dummy_input = torch.randn(batch_size, tiles_per_bag, input_dim).cuda()
-                lens = torch.tensor([tiles_per_bag] * batch_size).cuda()
+                dummy_input = torch.randn(batch_size, tiles_per_bag, input_dim, device=runtime.device)
+                lens = torch.tensor([tiles_per_bag] * batch_size, device=runtime.device)
                 return (dummy_input, lens)
 
             case ModelType.TransMIL | ModelType.BistroTransformer:
                 # BistroTransformer expects only input (no lens)
-                dummy_input = torch.randn(batch_size, tiles_per_bag, input_dim).cuda()
+                dummy_input = torch.randn(batch_size, tiles_per_bag, input_dim, device=runtime.device)
                 return (dummy_input,)
             
 

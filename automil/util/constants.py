@@ -31,7 +31,9 @@ FEATURE_EXTRACTOR = "ctranspath"
 LEARNING_RATE: float = 1e-4
 
 # Batch Size
-BATCH_SIZE: int = 32
+# Used for initial seeding of batch size
+# Later adjusted for memory constraints
+BATCH_SIZE: int = 5
 
 # Maximum Batch size for training, used for estimating VRAM usage
 # Choice of 100 is inspired by https://arxiv.org/abs/2503.10510v1
