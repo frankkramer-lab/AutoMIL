@@ -23,7 +23,7 @@ Evaluation utilities for AutoMIL.
 This module provides the :class:`automil.evaluation.Evaluator` class, which is responsible for evaluating trained MIL models
 computing classification metrics, optionally generating ensemble predictions and producing comparison plots.
 """
-import os
+import re
 from inspect import signature
 from pathlib import Path
 from typing import cast
@@ -45,6 +45,19 @@ from .util import INFO_CLR, LogLevel, get_vlog
 
 
 # === Helpers === #
+def contains_predictions(path: Path) -> bool:
+    """Determines whether a directory contains a predictions.parquet file
+
+    Args:
+        path (Path): Path to directory to check
+
+    Returns:
+        bool: Whether path contains a predictions.parquet file
+    """
+    return (path / "predictions.parquet").exists()
+
+
+
 def is_model_directory(path: Path) -> bool:
     """
     Determines whether a directory contains a valid trained Slideflow MIL model.
@@ -212,92 +225,123 @@ class Evaluator:
 
         Supports both binary and multi-class classification and automatically
         detects ensemble predictions when present.
-
-        Args:
-            predictions (pd.DataFrame | Path | str): Predictions DataFrame or path
-                to a ``predictions.parquet`` file.
-
-        Returns:
-            dict[str, float | np.ndarray]: Dictionary containing:
-                - Accuracy
-                - AUC
-                - Average Precision
-                - F1 score
-                - Confusion matrix
-                - Per-class accuracy
         """
+        import re
 
-        # Make sure we're working with a loaded DataFrame
+        # Ensure DataFrame
         match predictions:
             case Path() | str():
                 predictions = self.load_predictions(Path(predictions))
             case pd.DataFrame():
                 pass
-        
-        # Extract true labels and calculate number of classes
-        y_true = predictions["y_true"].astype(int)
-        num_classes = len(y_true.unique())
 
-        # We expect columns containing prediction probabilites to start with 'y_pred' (e.g 'y_pred0', 'y_pred1', ...)
-        # Similarly, we may have ensemble predictions ending with '_ensemble' (e.g., 'y_pred0_ensemble', 'y_pred1_ensemble', ...)
-        pred_columns = [column for column in predictions.columns if column.startswith("y_pred")]
-        # Case 1: Ensemble predictions (priority)
-        ensemble_columns = [col for col in pred_columns if col.endswith("_ensemble")]
+        if "y_true" not in predictions.columns:
+            raise ValueError("Predictions must contain a 'y_true' column")
+
+        y_true = predictions["y_true"].astype(int)
+
+        # Detect probability columns
+        pred_columns = [c for c in predictions.columns if c.startswith("y_pred")]
+
+        ensemble_columns = sorted(
+            [c for c in pred_columns if re.match(r"^y_pred\d+_ensemble$", c)],
+            key=lambda x: int(match.group()) if (match := re.search(r"\d+", x)) else 0
+        )
+
         if ensemble_columns:
-            # Use ensemble predictions
-            prob_columns = [f"y_pred{i}_ensemble" for i in range(num_classes)]
+            prob_columns = ensemble_columns
             prediction_type = "ensemble"
         else:
-            # Case 2: Single model predictions
-            # Get regular y_pred columns (y_pred0, y_pred1, etc.)
-            prob_columns = [f"y_pred{i}" for i in range(num_classes)]
+            prob_columns = sorted(
+                [c for c in pred_columns if re.match(r"^y_pred\d+$", c)],
+                key=lambda x: int(x.replace("y_pred", ""))
+            )
             prediction_type = "single model"
 
-        # Verify all expected probability columns exist
-        missing_columns = [col for col in prob_columns if col not in predictions.columns]
-        if missing_columns:
-            raise ValueError(f"Missing probability columns for {prediction_type} predictions: {missing_columns}")
-        
+        if not prob_columns:
+            raise ValueError(
+                f"No probability columns found for {prediction_type} predictions.\n"
+                f"Available columns: {list(predictions.columns)}"
+            )
+
         # Get probability matrix
+        num_classes = len(prob_columns)
         prob_matrix = predictions[prob_columns].values
 
-        # Get predicted classes
+        # Normalize probabilities (safety)
+        row_sums = prob_matrix.sum(axis=1, keepdims=True)
+        row_sums[row_sums == 0] = 1
+        prob_matrix = prob_matrix / row_sums
+
+        # Predicted labels
         if "y_pred_label" in predictions.columns:
             y_pred = predictions["y_pred_label"].astype(int)
         else:
             y_pred = np.argmax(prob_matrix, axis=1)
 
-        # Calculate metrics
+        # --- BBasic Metrics --- #
         accuracy = float(accuracy_score(y_true, y_pred))
-        cm = confusion_matrix(y_true, y_pred)
+        cm = confusion_matrix(y_true, y_pred, labels=range(num_classes))
 
-        # Binary classification
+        # --- Binary Classification --- #
         if num_classes == 2:
-            y_probs = prob_matrix[:, 1] # We really only need the prediction probabilities for label 1
 
-            auc = float(roc_auc_score(y_true, y_probs))
-            ap  = float(average_precision_score(y_true, y_probs))
-            f1  = float(f1_score(y_true, y_pred))
-        
-        # Multiclass
+            y_probs = prob_matrix[:, 1]
+
+            if len(np.unique(y_true)) > 1:
+                auc = float(roc_auc_score(y_true, y_probs))
+                ap = float(average_precision_score(y_true, y_probs))
+            else:
+                auc = float("nan")
+                ap = float("nan")
+
+            f1 = float(f1_score(y_true, y_pred))
+
+        # --- Multiclass Classification --- #
         else:
-            auc = float(roc_auc_score(y_true, prob_matrix, multi_class="ovr", average="macro"))
 
+            # AUC
+            try:
+                auc = float(
+                    roc_auc_score(
+                        y_true,
+                        prob_matrix,
+                        multi_class="ovr",
+                        average="macro",
+                        labels=range(num_classes)
+                    )
+                )
+            except ValueError:
+                auc = float("nan")
+
+            # AP
             ap_scores = []
+
             for class_idx in range(num_classes):
-                # 0 if label is class_idx, 1 otherwise
+
                 y_true_binary = (y_true == class_idx).astype(int)
-                # Prediction probabilities for this class
                 y_probs_class = prob_matrix[:, class_idx]
 
-                if len(y_true_binary.unique()) > 1:
-                    ap_class = average_precision_score(y_true_binary, y_probs_class)
-                    ap_scores.append(ap_class)
+                if len(np.unique(y_true_binary)) > 1:
+                    ap_scores.append(
+                        average_precision_score(y_true_binary, y_probs_class)
+                    )
 
-            ap = float(np.mean(ap_scores)) if ap_scores else 0.0
-            f1 = float(f1_score(y_true, y_pred, average="macro"))
+            ap = float(np.mean(ap_scores)) if ap_scores else float("nan")
 
-        per_class_accuracy = cm.diagonal() / cm.sum(axis=1)
+            # F1
+            f1 = float(
+                f1_score(
+                    y_true,
+                    y_pred,
+                    average="macro",
+                    labels=range(num_classes)
+                )
+            )
+
+        # --- Per-Class Accuracy --- #
+        with np.errstate(divide="ignore", invalid="ignore"):
+            per_class_accuracy = cm.diagonal() / cm.sum(axis=1)
 
         return {
             "Accuracy": accuracy,
@@ -417,135 +461,157 @@ class Evaluator:
 
     def create_ensemble_predictions(
         self,
-        model_dir: Path | None = None,
+        predictions_path: Path | None = None,
         output_path: Path | None = None,
         print_summary: bool = True
     ) -> tuple[pd.DataFrame, dict[str, float | np.ndarray]]:
-        """
-        Generates ensemble predictions by averaging outputs across multiple models.
 
-        Ensemble probabilities are computed per class and used to derive final
-        predictions and evaluation metrics.
-
-        Args:
-            model_dir (Path | None, optional): Directory containing trained models.
-            output_path (Path | None, optional): Output file path (.csv or .parquet).
-            print_summary (bool, optional): Print a formatted metric summary.
-
-        Raises:
-            ValueError: If no valid prediction files are found.
-
-        Returns:
-            tuple:
-                - Ensemble predictions DataFrame
-                - Dictionary of evaluation metrics
-        """
-
-        model_dir = model_dir or self.model_dir
+        predictions_path = predictions_path or self.out_dir
         output_path = output_path or (self.out_dir / "ensemble_predictions.parquet")
 
-        # Check if model_dir is a single model directory
-        if is_model_directory(model_dir):
-            model_paths = [model_dir]
-            self.vlog(f"Single model directory detected: [{INFO_CLR}]{model_dir}[/]")
-        # Else, collect all model subdirectories
-        else:
-            if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
-                self.vlog(f"No model directories found in [{INFO_CLR}]{model_dir}[/]", LogLevel.WARNING)
-                raise ValueError("No model directories found for ensembling")
-
-        # Try to load predictions from each model that has been evaluated (should all be in model_dir)
+        # Collects all (sub)folders containing prediction tables
+        prediction_dirs: list[Path] = []
+        # Collects all actual prediction tables
         predictions_list: list[pd.DataFrame] = []
-        for model_idx, submodel_dir in enumerate(model_paths):
+
+        # Case 1: Directory with predictions passed (single model)
+        if contains_predictions(predictions_path):
+            prediction_dirs = [predictions_path]
+            predictions_list = [self.load_predictions(predictions_path)]
+        else:
+            prediction_dirs = [
+                subdir
+                for subdir in predictions_path.iterdir()
+                if subdir.is_dir() and contains_predictions(subdir)
+            ]
+            predictions_list = [
+                self.load_predictions(pred_dir)
+                for pred_dir in prediction_dirs
+            ]
+
+        if not prediction_dirs:
+            raise ValueError(
+                f"No prediction directories found in {predictions_path}"
+            )
+
+        self.vlog(
+            f"Found [{INFO_CLR}]{len(prediction_dirs)}[/] prediction directories "
+            f"in [{INFO_CLR}]{predictions_path}[/]"
+        )
+
+        # Load predictions
+        predictions_list: list[pd.DataFrame] = []
+        for model_idx, submodel_dir in enumerate(prediction_dirs):
             try:
-                predictions = self.load_predictions(submodel_dir)
+                df = self.load_predictions(submodel_dir)
+                predictions_list.append(df)
 
-                # Add the model index to predictions columns so we can merge later
-                pred_columns = [column for column in predictions.columns if column.startswith("y_pred")]
-                rename_map = {pred_column: f"{pred_column}_model{model_idx}" for pred_column in pred_columns}
-                predictions = predictions.rename(columns=rename_map)
-                predictions_list.append(predictions)
+                self.vlog(
+                    f"Loaded predictions from model [{INFO_CLR}]{submodel_dir}[/] "
+                    f"([{INFO_CLR}]{model_idx+1}[/]/[{INFO_CLR}]{len(prediction_dirs)}[/])"
+                )
 
-                self.vlog(f"Loaded predictions from model [{INFO_CLR}]{submodel_dir.name}[/] ([{INFO_CLR}]{model_idx+1}[/]/[{INFO_CLR}]{len(os.listdir(model_dir))}[/])")
             except Exception as e:
-                self.vlog(f"Error loading predictions from {submodel_dir}: {e}", LogLevel.WARNING)
-                continue
-        
+                self.vlog(
+                    f"Error loading predictions from {submodel_dir}: {e}",
+                    LogLevel.WARNING
+                )
+
         if not predictions_list:
             raise ValueError("Failed to load any predictions from model directory")
 
-        # Merge predictions on the base columns
-        merged = predictions_list[0].copy()
+        for i, df in enumerate(predictions_list):
+            self.vlog(f"Model {i} prediction slides: {len(df)}")
 
-        for predictions in predictions_list[1:]:
-            merged = merged.merge(
-                predictions,
-                on=["slide", "y_true"],
-                how="inner"
+        # Additional check to ensure that we uses the same test set for predictions
+        n_models = len(predictions_list)
+        slide_sets = [set(df["slide"]) for df in predictions_list]
+        common_slides = set.intersection(*slide_sets)
+
+        self.vlog(f"Common slides across models: {len(common_slides)}")
+
+        if not common_slides:
+            raise ValueError(
+                "No overlapping slides across model predictions. "
+                "Ensure all models were evaluated on the same test set."
             )
-        
-        # Get all prediction columns
-        all_pred_columns = [
-            column for column in merged.columns
-            if column.startswith("y_pred")
-        ]
-        
-        if not all_pred_columns:
-            raise ValueError("No prediction columns found for ensembling")
-        
-        unique_classes = sorted(merged["y_true"].unique())
-        n_classes = len(unique_classes)
 
-        # Get prediction columns per class
-        class_prediction_columns = {}
+        # Filter all predictions to common slides
+        # TODO | Aborting if slide sets differ probably preferable
+        filtered_predictions = []
+        for df in predictions_list:
+            df = df[df["slide"].isin(common_slides)].sort_values("slide").reset_index(drop=True)
+            filtered_predictions.append(df)
+        predictions_list = filtered_predictions
+
+        # Build combined probability matrix
+        merged = predictions_list[0][["slide", "y_true"]].copy()
+        prob_matrices: list[np.ndarray] = []
+
+        for model_idx, df in enumerate(predictions_list):
+            
+            # y_pred0, y_pred1, y_pred2,...
+            prob_cols = sorted(
+                [c for c in df.columns if re.match(r"^y_pred\d+$", c)],
+                key=lambda x: int(x.replace("y_pred", ""))
+            )
+
+            if not prob_cols:
+                raise ValueError(f"No prediction columns found for model {model_idx}")
+
+            prob_matrix = df[prob_cols].values
+            prob_matrices.append(prob_matrix)
+
+            # Attach model predictions for inspection/debugging
+            renamed = df[prob_cols].add_suffix(f"_model{model_idx}")
+            merged = pd.concat([merged, renamed], axis=1)
+
+        # Calculate ensemble probabilities
+        prob_matrix = np.mean(prob_matrices, axis=0)
+
+        # Normalize probabilities (required for ROC-AUC)
+        row_sums = prob_matrix.sum(axis=1, keepdims=True)
+        row_sums[row_sums == 0] = 1
+        prob_matrix = prob_matrix / row_sums
+
+        n_classes = prob_matrix.shape[1]
+
+        # ensemble is attached back to merged
+        ensemble_columns = []
+
         for class_idx in range(n_classes):
-            class_prediction_columns[class_idx] = [
-                column for column in all_pred_columns
-                if column.startswith(f"y_pred{class_idx}_")
-            ]
-        
-        # Calculate ensemble (average) probabilities
-        ensemble_probs = {}
-        for class_idx in range(n_classes):
-            if class_prediction_columns[class_idx]:
-                ensemble_probs[f"y_pred{class_idx}_ensemble"] = merged[
-                    class_prediction_columns[class_idx]
-                ].mean(axis=1)
-            else:
-                self.vlog(f"No prediction columns found for class [{INFO_CLR}]{class_idx}[/]")
-                ensemble_probs[f"y_pred{class_idx}_ensemble"] = 0.0
+            col = f"y_pred{class_idx}_ensemble"
+            merged[col] = prob_matrix[:, class_idx]
+            ensemble_columns.append(col)
 
-        # Add ensemble probabilities to DataFrame
-        for column, probability in ensemble_probs.items():
-            merged[column] = probability
-
-        # Get probability matrix and make final predictions
-        ensemble_probability_columns = [f"y_pred{class_idx}_ensemble" for class_idx in range(n_classes)]
-        prob_matrix = merged[ensemble_probability_columns].values
+        # Calculate metrics
         predicted_classes = np.argmax(prob_matrix, axis=1)
         merged["y_pred_label"] = predicted_classes
 
-        # calculate metrics and print summary
         metrics = self.calculate_metrics(merged)
 
         # Optional summary
         if print_summary:
+
             summary = format_ensemble_summary(
-                len(predictions_list),
+                n_models,
                 metrics["ConfusionMatrix"],  # type: ignore
                 float(metrics["AUC"]),
                 float(metrics["AP"]),
                 float(metrics["Accuracy"]),
                 float(metrics["F1"])
             )
+
             self.vlog(summary)
 
         # Save results
         output_path.parent.mkdir(parents=True, exist_ok=True)
+
         if output_path.suffix == ".csv":
             merged.to_csv(output_path, index=False)
         else:
             merged.to_parquet(output_path, index=False)
+
         self.vlog(f"Ensemble predictions saved to [{INFO_CLR}]{output_path}[/]")
 
         return merged, metrics

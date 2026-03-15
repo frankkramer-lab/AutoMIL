@@ -19,3 +19,5 @@ model_test/
 dist/
 .pypirc
 results/
+hcd_grouped_project
+dataset_transform.py

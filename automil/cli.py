@@ -369,6 +369,8 @@ def run_pipeline(
             val_fraction=0.2,
             splits=split_file
         )
+        # Save base train split
+        base_train = train
         
         # === 6. Model Training === #
         for resolution in resolution_presets:
@@ -376,7 +378,7 @@ def run_pipeline(
                  f"[{INFO_CLR}]{len(train.slides())}[/] train slides"
             )
 
-            train, val = train.split(
+            train, val = base_train.split(
                 labels="label",
                 val_fraction=0.2
             )

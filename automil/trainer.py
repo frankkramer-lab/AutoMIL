@@ -121,16 +121,6 @@ class Trainer:
 
         self.vlog = get_vlog(verbose)
 
-        self.vlog("=== ATTENTION ===")
-        self.vlog(
-            self.runtime.peak_memory_mb()
-        )
-        self.runtime.reset_peak_memory()
-        self.vlog(
-            self.runtime.peak_memory_mb()
-        )
-
-
         # Hyperparameter validation
         self.model_manager = ModelManager(self.model)
         suggestions = self.model_manager.validate_hyperparameters(
