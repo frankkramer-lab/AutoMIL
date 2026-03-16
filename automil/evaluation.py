@@ -478,6 +478,7 @@ class Evaluator:
         if contains_predictions(predictions_path):
             prediction_dirs = [predictions_path]
             predictions_list = [self.load_predictions(predictions_path)]
+        # Case 2: Directory with multiple models passed
         else:
             prediction_dirs = [
                 subdir
@@ -493,42 +494,20 @@ class Evaluator:
             raise ValueError(
                 f"No prediction directories found in {predictions_path}"
             )
+        elif not predictions_list:
+            raise ValueError(
+                f"No predictions loaded from {predictions_path}"
+            )
 
         self.vlog(
             f"Found [{INFO_CLR}]{len(prediction_dirs)}[/] prediction directories "
             f"in [{INFO_CLR}]{predictions_path}[/]"
         )
 
-        # Load predictions
-        predictions_list: list[pd.DataFrame] = []
-        for model_idx, submodel_dir in enumerate(prediction_dirs):
-            try:
-                df = self.load_predictions(submodel_dir)
-                predictions_list.append(df)
-
-                self.vlog(
-                    f"Loaded predictions from model [{INFO_CLR}]{submodel_dir}[/] "
-                    f"([{INFO_CLR}]{model_idx+1}[/]/[{INFO_CLR}]{len(prediction_dirs)}[/])"
-                )
-
-            except Exception as e:
-                self.vlog(
-                    f"Error loading predictions from {submodel_dir}: {e}",
-                    LogLevel.WARNING
-                )
-
-        if not predictions_list:
-            raise ValueError("Failed to load any predictions from model directory")
-
-        for i, df in enumerate(predictions_list):
-            self.vlog(f"Model {i} prediction slides: {len(df)}")
-
         # Additional check to ensure that we uses the same test set for predictions
         n_models = len(predictions_list)
         slide_sets = [set(df["slide"]) for df in predictions_list]
         common_slides = set.intersection(*slide_sets)
-
-        self.vlog(f"Common slides across models: {len(common_slides)}")
 
         if not common_slides:
             raise ValueError(
@@ -616,10 +595,10 @@ class Evaluator:
 
         return merged, metrics
 
-    def compare_models(
+    def compare_predictions(
         self,
-        model_dir: Path | None = None,
-        metrics: list[str] = ["Accuracy", "AUC", "F1"]
+        predictions_path: Path | None = None,
+        metrics: list[str] = ["Accuracy", "AUC", "F1", "AP"]
     ) -> pd.DataFrame:
         """
         Compares evaluation metrics across multiple trained models.
@@ -631,26 +610,48 @@ class Evaluator:
         Returns:
             pd.DataFrame: Model-wise metric comparison table.
         """
+        predictions_path = predictions_path or self.out_dir
 
-        model_dir = model_dir or self.model_dir
-        
-        # Check if model_dir is a single model directory
-        if is_model_directory(model_dir):
-            model_paths = [model_dir]
-            self.vlog(f"Single model directory detected: [{INFO_CLR}]{model_dir}[/]")
-        # Else, collect all model subdirectories
+        # Collects all (sub)folders containing prediction tables
+        prediction_dirs: list[Path] = []
+        # Collects all actual prediction tables
+        predictions_dict: dict[str, pd.DataFrame] = {}
+
+        # Case 1: Directory with predictions passed (single model)
+        if contains_predictions(predictions_path):
+            prediction_dirs = [predictions_path]
+            predictions_dict[predictions_path.name] = self.load_predictions(predictions_path)
         else:
-            if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
-                self.vlog(f"No model directories found in [{INFO_CLR}]{model_dir}[/]", LogLevel.WARNING)
-                raise ValueError("No model directories found for comparison")
+            prediction_dirs = [
+                subdir
+                for subdir in predictions_path.iterdir()
+                if subdir.is_dir() and contains_predictions(subdir)
+            ]
+            predictions_dict = {
+                pred_dir.name: self.load_predictions(pred_dir)
+                for pred_dir in prediction_dirs
+            }
+
+        if not prediction_dirs:
+            raise ValueError(
+                f"No prediction directories found in {predictions_path}"
+            )
+        elif not predictions_dict:
+            raise ValueError(
+                f"No predictions loaded from {predictions_path}"
+        )
+    
+        self.vlog(
+            f"Found [{INFO_CLR}]{len(prediction_dirs)}[/] prediction directories "
+            f"in [{INFO_CLR}]{predictions_path}[/]"
+        )
 
         comparison_data = []
-        for model_path in model_paths:
+        for model_name, predictions in predictions_dict.items():
             try:
-                predictions = self.load_predictions(model_path)
                 model_metrics = self.calculate_metrics(predictions)
                 
-                row: dict[str, str | float] = {"model": model_path.name}
+                row: dict[str, str | float] = {"model": model_name}
                 for metric in metrics:
                     if metric in model_metrics:
                         value = model_metrics[metric]
@@ -665,7 +666,7 @@ class Evaluator:
                 comparison_data.append(row)
                 
             except Exception as e:
-                self.vlog(f"Failed to evaluate [{INFO_CLR}]{model_path.name}[/]: {e}", LogLevel.WARNING)
+                self.vlog(f"Failed to evaluate [{INFO_CLR}]{model_name}[/]: {e}", LogLevel.WARNING)
                 continue
         
         comparison_df = pd.DataFrame(comparison_data)

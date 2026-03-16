@@ -409,7 +409,7 @@ def run_pipeline(
             output_path=Path(project.root) / "ensemble_predictions.csv"
         )
 
-        evaluator.compare_models()
+        evaluator.compare_predictions()
         evaluator.generate_plots(
             save_path=Path(project.root) / "figures",
             model_paths=None
@@ -1138,7 +1138,7 @@ def evaluate(
             verbose=verbose
         )
         evaluator.evaluate_models(generate_attention_heatmaps=True)
-        evaluator.compare_models()
+        evaluator.compare_predictions()
         evaluator.generate_plots()
 
     except Exception as e:
