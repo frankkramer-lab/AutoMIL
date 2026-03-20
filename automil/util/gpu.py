@@ -30,16 +30,10 @@ def get_free_memory() -> float:
     free_mem, _ = torch.cuda.mem_get_info()
     return free_mem / (1024 ** 2)  # Convert to MB
 
-def get_cuda_gpu_memory_used() -> int:
-    """Retrieves the total memory the cuda driver has reserved using nvidia-smi.
-
-    Returns:
-        int: Memory in MB
-    """
-    result = subprocess.check_output(
-        ['nvidia-smi', '--query-gpu=memory.used', '--format=csv,nounits,noheader']
-    )
-    return int(result.decode().strip().split('\n')[0])  # memory in MB of GPU 0
+def get_gpu_memory_used():
+    if not torch.cuda.is_available():
+        return 0
+    return torch.cuda.memory_allocated() // (1024 * 1024)
 
 def reserve_tensor_memory() -> float:
     """Gets the amount of memory overhead reserved when allocating a minimal tensor (small as possible).
@@ -53,8 +47,8 @@ def reserve_tensor_memory() -> float:
 
     # We can get the memory overhead by measuring
     # the total memory reserved before and after allocating a minimal tensor
-    before = get_cuda_gpu_memory_used()
+    before = get_gpu_memory_used()
     a = torch.FloatTensor(1).cuda()
     torch.cuda.synchronize() # Ensure the allocation is complete
-    after = get_cuda_gpu_memory_used()
+    after = get_gpu_memory_used()
     return after - before
