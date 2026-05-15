@@ -1,0 +1,61 @@
+/* AutoMIL custom scheme */
+[data-md-color-scheme="automil"] {
+  /* Primary */
+  --md-primary-fg-color: #253140;
+  --md-primary-fg-color--light: #37465a;
+  --md-primary-fg-color--dark: #1a2430;
+
+  /* Accent */
+  --md-accent-fg-color: #c46b2d;
+  --md-accent-fg-color--light: #da8650;
+  --md-accent-fg-color--dark: #9e5623;
+
+  /* Background / main page */
+  --md-default-bg-color: #efeee9;
+  --md-default-fg-color: #1a1a1a;
+
+  --md-primary-bg-color: var(--md-default-bg-color);
+
+  /* Content blocks */
+  --md-content-bg-color: #ffffff;
+  --md-code-bg-color: #ffffff;
+
+  /* border color */
+  --md-border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-md-color-scheme="automil-ether"] {
+  /* Primary */
+  --md-primary-fg-color: #236ac6;
+  --md-primary-fg-color--light: #144589;
+  --md-primary-fg-color--dark: #253140;
+
+  /* Accent */
+  --md-accent-fg-color: #da8650;
+  --md-accent-fg-color--light: #ed9c6f;
+  --md-accent-fg-color--dark: #c46b2d;
+
+  /* Background / main page */
+  --md-default-bg-color: #242413;
+  --md-default-fg-color: #1a1a1a;
+
+  /* Content blocks */
+  --md-content-bg-color: #ffffff;
+  --md-code-bg-color: #ffffff;
+
+  /* border color */
+  --md-border-color: rgba(0, 0, 0, 0.1);
+
+}
+
+/* image grid specs */
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.image-grid img {
+  width: 100%;
+  border-radius: 6px;
+}
