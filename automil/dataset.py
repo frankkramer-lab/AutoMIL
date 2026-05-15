@@ -81,6 +81,8 @@ class Dataset():
         resolution: RESOLUTION_PRESETS,
         label_map: dict | list[str],
         slide_dir: Path,
+        tissue_detection: str = "otsu",
+        stain_normalizer: str = "reinhard",
         bags_dir:  Path | None = None,
         is_pretiled:  bool = False,
         tiff_conversion: bool = False,
@@ -100,6 +102,9 @@ class Dataset():
         """
         self.project = project
         self.resolution = resolution
+
+        self.tissue_detection = tissue_detection
+        self.stain_normalizer = stain_normalizer
 
         self.slide_dir = slide_dir
         self.bags_dir  = bags_dir
@@ -354,8 +359,8 @@ class Dataset():
         if not self.tiff_conversion:
             self.vlog(f"Extracting tiles at [{INFO_CLR}]{self.magnification} | tile={self.tile_px}[/]")
             dataset.extract_tiles(
-                qc=qc.Otsu(),
-                normalizer="reinhard_mask",
+                qc=self.tissue_detection,
+                normalizer=self.stain_normalizer,
                 report=True,
             )
             return
@@ -420,8 +425,8 @@ class Dataset():
                 # Extract tiles
                 try:
                     dataset.extract_tiles(
-                        qc=qc.Otsu(),
-                        normalizer="reinhard_mask",
+                        qc=self.tissue_detection,
+                        normalizer=self.stain_normalizer,
                         mpp_override=self.mpp
                     )
                 except Exception as e:

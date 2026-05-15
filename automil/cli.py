@@ -33,6 +33,7 @@ import click
 # === Internal imports === #
 from .cli_help import (CREATE_SPLIT_HELP, EVALUATE_HELP, PREDICT_HELP,
                        RUN_PIPELINE_HELP, TRAIN_HELP)
+from .custom_click_params import LazyChoice
 
 # === Setup === #
 CONTEXT_SETTINGS = {
@@ -100,6 +101,12 @@ def AutoMIL():
     default=td_choice.choices[0],
     help="Tissue detection method to utilize"
 )
+@click.option(
+    "--stain-normalizer",
+    type=(sn_choice := LazyChoice("slideflow.norm", attribute="StainNormalizer", transform=lambda cls: cls.normalizers.keys())),
+    default="reinhard",
+    help="Stain normalization method to utilize (e.g. macenko, reinhard, vahadane)"
+)
 @click.option("-t", "--transform_labels", is_flag=True, help="Transforms labels to float values (0.0, 1.0, ...)")
 @click.option("-p", "--is-pretiled",      is_flag=True, help="Indicated that the input format is pretiled slides")
 @click.option("-v", "--verbose",          is_flag=True, help="Enables additional logging messages")
@@ -114,6 +121,8 @@ def run_pipeline(
     model:           str,
     k:               int,
     split_file:      str | None,
+    tissue_detection: str,
+    stain_normalizer: str,
     transform_labels: bool,
     is_pretiled:      bool,
     verbose:          bool
@@ -358,6 +367,8 @@ def run_pipeline(
                 project,
                 preset,
                 label_map,
+                tissue_detection=tissue_detection,
+                stain_normalizer=stain_normalizer,
                 slide_dir=Path(slide_dir),
                 bags_dir=Path(project_dir) / "bags",
                 is_pretiled=is_pretiled,
@@ -463,6 +474,18 @@ def run_pipeline(
     help=f"Model type to train and evaluate"
 )
 @click.option(
+    "--tissue-detection",
+    type=(td_choice := click.Choice(choices=["otsu", "blur", "both"])),
+    default=td_choice.choices[0],
+    help="Tissue detection method to utilize"
+)
+@click.option(
+    "--stain-normalizer",
+    type=(sn_choice := LazyChoice("slideflow.norm", attribute="StainNormalizer", transform=lambda cls: cls.normalizers.keys())),
+    default="reinhard",
+    help="Stain normalization method to utilize (e.g. macenko, reinhard, vahadane)"
+)
+@click.option(
     "-k", type=int, default=3,
     help="number of folds to train per resolution level"
 )
@@ -478,6 +501,8 @@ def train(
     slide_column:    str | None,
     resolutions:     str,
     model:           str,
+    tissue_detection: str,
+    stain_normalizer: str,
     k:               int,
     is_pretiled:      bool,
     transform_labels: bool,
@@ -710,6 +735,8 @@ def train(
                 resolution,
                 label_map,
                 slide_dir=Path(slide_dir),
+                tissue_detection=tissue_detection,
+                stain_normalizer=stain_normalizer,
                 bags_dir=Path(project_dir) / "bags",
                 is_pretiled=is_pretiled,
                 tiff_conversion=tiff_conversion,
