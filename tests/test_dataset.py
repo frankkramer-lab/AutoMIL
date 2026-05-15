@@ -7,12 +7,13 @@ from automil.dataset import Dataset
 from automil.util import COMMON_MPP_VALUES, RESOLUTION_PRESETS
 
 
-def test_dataset_initialization(mock_project):
+def test_dataset_initialization(mock_project, tmp_path):
     """Test basic Dataset initialization."""
     dataset = Dataset(
         project=mock_project,
         resolution=RESOLUTION_PRESETS.Low,
         label_map={"tumor": 1, "normal": 0},
+        slide_dir=tmp_path
     )
 
     assert dataset.project is mock_project
@@ -21,13 +22,14 @@ def test_dataset_initialization(mock_project):
     assert dataset.is_pretiled is False
 
 
-def test_cached_properties(mock_project):
+def test_cached_properties(mock_project, tmp_path):
     """Test that cached properties return expected values."""
     with patch.object(Dataset, "_compute_mpp", return_value=0.5):
         dataset = Dataset(
             project=mock_project,
             resolution=RESOLUTION_PRESETS.High,
-            label_map={"A": 0}
+            label_map={"A": 0},
+            slide_dir=tmp_path
         )
 
         assert dataset.tile_px == RESOLUTION_PRESETS.High.tile_px
@@ -36,7 +38,7 @@ def test_cached_properties(mock_project):
         assert dataset.tile_um == int(dataset.tile_px * 0.5)
 
 
-def test_tfrecords_directory_paths(mock_project):
+def test_tfrecords_directory_paths(mock_project, tmp_path):
     """Test tfrecords_dir returns correct paths for different configurations."""
     base = Path(mock_project.root)
 
@@ -44,7 +46,8 @@ def test_tfrecords_directory_paths(mock_project):
     dataset = Dataset(
         project=mock_project,
         resolution=RESOLUTION_PRESETS.Low,
-        label_map={"A": 0}
+        label_map={"A": 0},
+        slide_dir=tmp_path
     )
     assert dataset.tfrecords_dir == base / "tfrecords"
     
@@ -53,7 +56,8 @@ def test_tfrecords_directory_paths(mock_project):
         project=mock_project,
         resolution=RESOLUTION_PRESETS.Low,
         label_map={"A": 0},
-        is_pretiled=True
+        is_pretiled=True,
+        slide_dir=tmp_path
     )
     assert dataset_pretiled.tfrecords_dir == base / "tfrecords" / "pretiled"
     
@@ -62,27 +66,10 @@ def test_tfrecords_directory_paths(mock_project):
         project=mock_project,
         resolution=RESOLUTION_PRESETS.Low,
         label_map={"A": 0},
-        tiff_conversion=True
+        tiff_conversion=True,
+        slide_dir=tmp_path
     )
     assert dataset_tiff.tfrecords_dir == base / "tfrecords" / "tiff_buffer"
-
-def test_mpp_falls_back_to_common_values_when_no_slide_dir(mock_project):
-    """
-    Test that Dataset.mpp falls back to COMMON_MPP_VALUES when no slide_dir is provided.
-    """
-    dataset = Dataset(
-        project=mock_project,
-        resolution=RESOLUTION_PRESETS.High,
-        label_map={"A": 0},
-    )
-
-    dataset.slide_dir = None
-
-    mpp = dataset.mpp
-    expected = COMMON_MPP_VALUES.get(dataset.magnification, 0.5)
-
-    assert mpp == expected
-
 
 def test_mpp_uses_calculated_average_when_available(mock_project):
     """
@@ -121,20 +108,6 @@ def test_tile_um_is_derived_from_mpp_and_tile_px(mock_project):
 
         assert dataset.tile_um == int(dataset.tile_px * dataset.mpp)
 
-
-def test_pretiled_without_slide_dir_raises_error(mock_project):
-    dataset = Dataset(
-        project=mock_project,
-        resolution=RESOLUTION_PRESETS.Low,
-        label_map={"A": 0},
-        is_pretiled=True,
-        slide_dir=None,
-    )
-
-    with pytest.raises(ValueError, match="slide_dir must be provided"):
-        dataset.prepare_dataset_source()
-
-
 def test_prepare_dataset_source_calls_convert_pretiled_if_is_pretiled(mock_project):
     fake_dataset = MagicMock()
 
@@ -156,7 +129,7 @@ def test_prepare_dataset_source_calls_convert_pretiled_if_is_pretiled(mock_proje
         mock_convert.assert_called_once()
         assert result is fake_dataset
 
-def test_prepare_dataset_source_calls_extract_tiles_if_not_pretiled(mock_project):
+def test_prepare_dataset_source_calls_extract_tiles_if_not_pretiled(mock_project, tmp_path):
     fake_dataset = MagicMock()
 
     mock_project.dataset = MagicMock(return_value=fake_dataset)
@@ -171,11 +144,10 @@ def test_prepare_dataset_source_calls_extract_tiles_if_not_pretiled(mock_project
             resolution=RESOLUTION_PRESETS.Low,
             label_map={"A": 0},
             is_pretiled=False,
+            slide_dir=tmp_path
         )
 
         result = dataset.prepare_dataset_source()
 
         mock_extract.assert_called_once_with(fake_dataset)
         assert result is fake_dataset
-
-
