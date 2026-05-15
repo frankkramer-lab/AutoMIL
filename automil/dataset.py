@@ -80,7 +80,7 @@ class Dataset():
         project: sf.Project,
         resolution: RESOLUTION_PRESETS,
         label_map: dict | list[str],
-        slide_dir: Path | None = None,
+        slide_dir: Path,
         bags_dir:  Path | None = None,
         is_pretiled:  bool = False,
         tiff_conversion: bool = False,
@@ -278,7 +278,7 @@ class Dataset():
             unique_type = type(unique_labels[0])
 
             if ann_type != unique_type:
-                unique_labels = [ann_type(lbl) for lbl in unique_labels]
+                unique_labels = [ann_type(lbl) for lbl in unique_labels] # type: ignore
         
         self.vlog(f"Filtering for unique labels {unique_labels}")
 
@@ -385,7 +385,7 @@ class Dataset():
             tfrecords_dir.mkdir(parents=True, exist_ok=True)
 
             # Retieve slide paths and IDs
-            slide_list: list[Path] = [path for p in dataset.slide_paths() if (path := Path(p)).exists()]
+            slide_list: list[Path] = [path for path in self.slide_dir.iterdir() if path.is_file() and path.suffix == ".png"]
             slide_ids:  list[str]  = list(set(slide.stem for slide in slide_list)) # Using a set to avoid duplicates
 
             # Caution: Make sure the tfrecords dont actually exist yet (e.g., from previous runs)

@@ -498,33 +498,6 @@ class Trainer:
         )
         self.vlog(f"Attention heatmaps generated in [{INFO_CLR}]{heatmap_dir}[/]")
     
-    def _compute_optimal_batch_size(self) -> int:
-        """Compute VRAM-Optimal batch size based on estimated model memory usage and free memory
-
-        Returns:
-            int: adjusted batch size
-        """
-        adjusted_batch_size = adjust_batch_size(
-            self.model,
-            self.initial_batch_size,
-            self.num_slides,
-            self.num_features,
-            self.bag_avg,
-        )
-
-        # Ensure we do not exceed model-specific maximum batch size
-        adjusted_batch_size = min(
-            self.model_manager.config.max_batch_size,
-            adjusted_batch_size
-        )
-        
-        self.vlog(
-            f"Adjusted batch size to [{INFO_CLR}]{adjusted_batch_size}[/] "
-            f"(tiles/bag={self.bag_avg}, dim={self.num_features})"
-        )
-        
-        return adjusted_batch_size
-    
     def _estimate_model_size(self) -> float:
         """Estimate model size (reserved memory) in MB
 

@@ -33,6 +33,7 @@ import click
 # === Internal imports === #
 from .cli_help import (CREATE_SPLIT_HELP, EVALUATE_HELP, PREDICT_HELP,
                        RUN_PIPELINE_HELP, TRAIN_HELP)
+from .util.custom_click_params import StainNormalizerType
 
 # === Setup === #
 CONTEXT_SETTINGS = {
@@ -93,6 +94,12 @@ def AutoMIL():
 @click.option(
     "--split-file", type=click.Path(file_okay=True), default="split.json",
     help="Path to a .json file defining train-test splits"
+)
+@click.option(
+    "--tissue-detection",
+    type=(td_choice := click.Choice(choices=["otsu", "blur", "both"])),
+    default=td_choice.choices[0],
+    help="Tissue detection method to utilize"
 )
 @click.option("-t", "--transform_labels", is_flag=True, help="Transforms labels to float values (0.0, 1.0, ...)")
 @click.option("-p", "--is-pretiled",      is_flag=True, help="Indicated that the input format is pretiled slides")
