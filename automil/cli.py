@@ -33,7 +33,6 @@ import click
 # === Internal imports === #
 from .cli_help import (CREATE_SPLIT_HELP, EVALUATE_HELP, PREDICT_HELP,
                        RUN_PIPELINE_HELP, TRAIN_HELP)
-from .util.custom_click_params import StainNormalizerType
 
 # === Setup === #
 CONTEXT_SETTINGS = {
