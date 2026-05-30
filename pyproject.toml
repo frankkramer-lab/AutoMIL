@@ -53,7 +53,7 @@ test = [
 Homepage = "https://github.com/jonas/AutoMIL"
 
 [project.scripts]
-automil = "automil.cli:main"
+automil = "automil.cli.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["automil"]
