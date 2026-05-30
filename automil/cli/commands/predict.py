@@ -156,9 +156,10 @@ def predict(
     """
 
     import slideflow as sf
-    from evaluation import Evaluator
-    from project import Project
-    from util import INFO_CLR, LogLevel, get_vlog
+
+    from automil.evaluation import Evaluator
+    from automil.project import Project
+    from automil.util import INFO_CLR, LogLevel, get_vlog
 
     # Getting a verbose logger
     vlog = get_vlog(verbose)

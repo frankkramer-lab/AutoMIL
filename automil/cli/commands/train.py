@@ -21,14 +21,15 @@
 import sys
 import traceback
 from pathlib import Path
+
 import click
 
-from ..help import TRAIN_HELP
 from ..constants import CONTEXT_SETTINGS
+from ..core import (column_overwrite_options, dataset_options,
+                    preprocessing_options, train_arguments, train_options,
+                    verbose_option)
+from ..help import TRAIN_HELP
 
-from ..core import (train_arguments, column_overwrite_options, train_options,
-                    preprocessing_options, dataset_options, verbose_option
-)
 
 @click.command(
     name="train",
@@ -204,13 +205,13 @@ def train(
     
     import slideflow as sf
 
-    from dataset import Dataset
-    from project import Project
-    from trainer import Trainer
-    from util import (INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType,
-                       get_vlog)
-    from util.backend import configure_image_backend, has_png_slides
-    from util.pretiled import is_input_pretiled
+    from automil.dataset import Dataset
+    from automil.project import Project
+    from automil.trainer import Trainer
+    from automil.util import (INFO_CLR, RESOLUTION_PRESETS, LogLevel,
+                              ModelType, get_vlog)
+    from automil.util.backend import configure_image_backend, has_png_slides
+    from automil.util.pretiled import is_input_pretiled
 
     # Getting a verbose logger
     vlog = get_vlog(verbose)

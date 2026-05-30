@@ -21,10 +21,12 @@
 import sys
 import traceback
 from pathlib import Path
+
 import click
 
-from ..help import CREATE_SPLIT_HELP
 from ..constants import CONTEXT_SETTINGS
+from ..help import CREATE_SPLIT_HELP
+
 
 @click.command(
     "create-split",
@@ -102,7 +104,7 @@ def create_split(
 
     import slideflow as sf
 
-    from util import INFO_CLR, LogLevel, get_vlog
+    from automil.util import INFO_CLR, LogLevel, get_vlog
 
     # Getting a verbose logger
     vlog = get_vlog(verbose)
