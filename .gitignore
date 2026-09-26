@@ -1,24 +1,19 @@
-test_dataset
-.python-version
-.venv
+# Python
+__pycache__/
+.venv/
 uv.lock
-logs/
-sandbox.py
-slideflow.log
-data
-__pycache__
-*.txt
-*.log
-Datasets/*
-batch_size_analysis/*
-automil/dataset_transform.py
-automil/DatasetTransforms
-split.json
-project_*
-model_test/
 dist/
 .pypirc
+
+# Logs
+logs/
+*.log
+
+# Datasets and run outputs
+data/
+Datasets/
+test_dataset/
 results/
-hcd_grouped_project
-dataset_transform.py
-hcd_subset_project
+project_*/
+model_test/
+split.json

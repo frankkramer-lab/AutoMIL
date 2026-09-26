@@ -22,6 +22,7 @@
 import sys
 import traceback
 import warnings
+from importlib.metadata import version
 
 # Suppressing warnings related to pkg_ressources and timm
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -46,7 +47,7 @@ MODEL_CHOICES = ["Attention_MIL", "TransMIL", "BistroTransformer"]
 
 # === CLI === #
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.version_option(version="1.0.0", prog_name="AutoMIL")
+@click.version_option(version=version("automil"), prog_name="AutoMIL")
 def AutoMIL():
     """AutoMIL: Automated Multiple Instance Learning for Whole Slide Images."""
     pass
