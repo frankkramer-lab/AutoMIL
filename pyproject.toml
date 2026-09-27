@@ -75,7 +75,7 @@ Repository = "https://github.com/frankkramer-lab/AutoMIL"
 Issues = "https://github.com/frankkramer-lab/AutoMIL/issues"
 
 [project.scripts]
-automil = "automil.cli:main"
+automil = "automil.cli.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["automil"]
