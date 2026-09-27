@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "AutoMIL: Automated Machine Learning for Image Classification in Whole-Slide Imaging with Multiple Instance Learning"
+type: software
+authors:
+  - family-names: Waibel
+    given-names: Jonas
+    affiliation: University of Augsburg
+version: 0.1.0
+license: GPL-3.0-or-later
+repository-code: "https://github.com/frankkramer-lab/AutoMIL"
+url: "https://frankkramer-lab.github.io/AutoMIL/"
+keywords:
+  - multiple instance learning
+  - whole-slide imaging
+  - computational pathology
+  - automl
