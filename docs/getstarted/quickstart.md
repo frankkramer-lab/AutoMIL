@@ -4,7 +4,7 @@ This guide walks you through a minimal, end-to-end AutoMIL workflow: from prepar
 
 ??? info "Dataset Infos"
 
-	For the purposes of this demonstration, we use an example set of whole-slide images from [The Cancer Genome Atlas Program (TCGA)](https://www.cancer.gov/ccg/research/genome-sequencing/tcga) consisting of lung tissue samples. This dataset can be downloaded via [slideflows project module](https://slideflow.dev/project/#slideflow.Project), which provides the slides in the form of a preconfigured project named `LungAdenoSquam`. Since the indiviual image files are quite large and the full project contains 941 slides, we restrict this example to a randomly sampled subset of 100 slides. The subset can be replicated using this [annotation file](../assets/lung_labels.csv). Provide this file to slideflows API to make sure only the annotated slides are downloaded:
+	For the purposes of this demonstration, we use an example set of whole-slide images from [The Cancer Genome Atlas Program (TCGA)](https://www.cancer.gov/ccg/research/genome-sequencing/tcga) consisting of lung tissue samples. This dataset can be downloaded via [slideflows project module](https://slideflow.dev/project/#slideflow.Project), which provides the slides in the form of a preconfigured project named `LungAdenoSquam`. Since the individual image files are quite large and the full project contains 941 slides, we restrict this example to a randomly sampled subset of 100 slides. The subset can be replicated using this [annotation file](../assets/lung_labels.csv). Provide this file to slideflows API to make sure only the annotated slides are downloaded:
 
 	```python
 		#!/usr/bin/env python3

@@ -44,7 +44,7 @@ def is_feasible(
     min_steps_per_epoch: int = 1,
 ) -> tuple[bool, list[str]]:
     """Checks the given input arguments against sensible upper and lower limits and determines whether they are feasible.
-    This method also performs memory estimation to see if the given cofiguration would exceed the free memory with respect to a given safety margin.
+    This method also performs memory estimation to see if the given configuration would exceed the free memory with respect to a given safety margin.
 
     Args:
         runtime (RuntimeContext): RuntimeContext instance
@@ -62,7 +62,7 @@ def is_feasible(
     """
     violations = []
 
-    # === Batch size contraints === #
+    # === Batch size constraints === #
     if batch_size > dataset_size:
         violations.append("batch_size_exceeds_dataset_size")
 
@@ -112,7 +112,7 @@ def is_feasible_cheap(
     """
     violations = []
 
-    # === Batch size contraints === #
+    # === Batch size constraints === #
     if batch_size > dataset_size:
         violations.append("batch_size_exceeds_dataset_size")
 

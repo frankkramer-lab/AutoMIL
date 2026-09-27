@@ -10,7 +10,7 @@ AutoMIL can be installed directly from its public :material-github: [GitHub](htt
 git clone https://github.com/frankkramer-lab/AutoMIL
 ```
 
-This will clone the projects source code inside a new directory called `./automil`. Navigate to this directory and install AutoMIL in your current python environment:
+This will clone the project's source code into a new directory called `./AutoMIL`. Navigate to this directory and install AutoMIL in your current python environment:
 
 ```bash
 pip install .

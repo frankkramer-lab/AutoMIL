@@ -33,7 +33,7 @@ To get started, go to the [Installation Instructions](getstarted/installation.md
 
 ## Built upon Slideflow
 
-AutoMIL is built on top of the :material-microscope: [Slideflow](https://slideflow.dev/overview/) framework for WSI data handling and preprocessing. Slideflow provides efficient data loading, tiling, and augmentation functionalities specifically designed for Whole Slide Images, making it an ideal foundation for MIL model training. **AutoMIL**s contribution lies in automating the selection of hyperparamaters, model architectures, and training procedures specifically tailored for MIL tasks on WSI data, as well as providing a single entry-point so the user experience is streamlined.
+AutoMIL is built on top of the :material-microscope: [Slideflow](https://slideflow.dev/overview/) framework for WSI data handling and preprocessing. Slideflow provides efficient data loading, tiling, and augmentation functionalities specifically designed for Whole Slide Images, making it an ideal foundation for MIL model training. **AutoMIL**'s contribution lies in automating the selection of hyperparameters, model architectures, and training procedures specifically tailored for MIL tasks on WSI data, as well as providing a single entry-point so the user experience is streamlined.
 
 ## Project layout
 

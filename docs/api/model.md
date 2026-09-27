@@ -1,7 +1,7 @@
 # ModelManager
 
 `automil.model.ModelManager` provides model management utilities and is responsible for instantiating MIL models and
-validating hyperparameters against model-specific contraints and limits
+validating hyperparameters against model-specific constraints and limits
 
 ::: automil.model.ModelManager
 

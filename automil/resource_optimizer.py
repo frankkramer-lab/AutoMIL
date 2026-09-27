@@ -114,7 +114,7 @@ class ResourceOptimizer:
         if last_safe == 0:
             return 1
 
-        # === Loop 2: Determine maximum feaisble batch size via binary search === #
+        # === Loop 2: Determine maximum feasible batch size via binary search === #
         low = last_safe
         high = batch_size
         best = last_safe

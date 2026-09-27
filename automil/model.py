@@ -21,7 +21,7 @@
 Model management utilities for AutoMIL.
 
 This module provides the :class:`automil.model.ModelManager` class, which is responsible for instantiating MIL models and
-validating hyperparameters against model-specific contraints/limits
+validating hyperparameters against model-specific constraints/limits
 """
 from __future__ import annotations
 
