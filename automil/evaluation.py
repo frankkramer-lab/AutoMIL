@@ -37,8 +37,7 @@ from matplotlib.axes import Axes
 from matplotlib.container import BarContainer
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
-from sklearn.metrics import (accuracy_score, average_precision_score,
-                             confusion_matrix, f1_score, roc_auc_score)
+from sklearn.metrics import accuracy_score, average_precision_score, confusion_matrix, f1_score, roc_auc_score
 from slideflow.mil import eval_mil, predict_mil
 
 from .util import INFO_CLR, LogLevel, get_vlog
@@ -101,7 +100,7 @@ def format_ensemble_summary(
 ) -> str:
     """
     Formats ensemble evaluation metrics into a readable summary.
-    
+
     Args:
         num_models: Number of models in the ensemble
         confusion_matrix: Confusion matrix (can be binary 2x2 or multi-class NxN)
@@ -111,12 +110,12 @@ def format_ensemble_summary(
         f1: F1 score (macro for multiclass, regular for binary)
         f1_macro: Macro F1 score (multiclass only)
         f1_weighted: Weighted F1 score (multiclass only)
-    
+
     Returns:
         Formatted summary string
     """
     n_classes = confusion_matrix.shape[0]
-    
+
     if n_classes == 2:
         # Binary classification - original format
         tn, fp, fn, tp = confusion_matrix.ravel()
@@ -134,7 +133,7 @@ def format_ensemble_summary(
 
     # Build metrics section
     metrics_text = f"""-- AUC: {auc:.3f}
--- Average Precision: {ap:.3f}  
+-- Average Precision: {ap:.3f}
 -- Accuracy: {acc:.3%}
 -- F1 Score: {f1:.3f}"""
     summary = f"""
@@ -200,7 +199,7 @@ class Evaluator:
         """
         if not (predictions_path := model_path / "predictions.parquet").exists():
             raise FileNotFoundError(f"{model_path} does not contain a 'predictions.parquet' file")
-        
+
         predictions = pd.read_parquet(predictions_path)
 
         all_columns = [column for column in predictions.columns]
@@ -213,9 +212,9 @@ class Evaluator:
             raise ValueError("'predictions.parquet' does not contain the expected prediction columns")
         elif not all(base_column in all_columns for base_column in base_columns):
             raise ValueError("'predictions.parquet' does not contain the expected base columns")
-        
+
         return predictions
-    
+
     def calculate_metrics(
         self,
         predictions: pd.DataFrame | Path | str
@@ -385,7 +384,7 @@ class Evaluator:
             if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
                 self.vlog(f"No model directories found in {model_dir}", LogLevel.WARNING)
                 return
-        
+
         # Iterate over each model directory and evaluate
         for model_idx, model_path in enumerate(model_paths):
             self.vlog(f"Evaluating model [{INFO_CLR}]{model_idx+1}[/]/[{INFO_CLR}]{len(model_paths)}[/]: [{INFO_CLR}]{model_path}[/]")
@@ -433,7 +432,7 @@ class Evaluator:
             if not (model_paths := [subdir for subdir in model_dir.iterdir() if subdir.is_dir() and is_model_directory(subdir)]):
                 self.vlog(f"No model directories found in [{INFO_CLR}]{model_dir}[/]", LogLevel.WARNING)
                 return
-        
+
         # Iterate over each model directory and generate predictions
         for model_idx, model_path in enumerate(model_paths):
             self.vlog(f"Generating predictions with model [{INFO_CLR}]{model_idx+1}[/]/[{INFO_CLR}]{len(model_paths)}[/]: [{INFO_CLR}]{model_path}[/]")
@@ -528,7 +527,7 @@ class Evaluator:
         prob_matrices: list[np.ndarray] = []
 
         for model_idx, df in enumerate(predictions_list):
-            
+
             # y_pred0, y_pred1, y_pred2,...
             prob_cols = sorted(
                 [c for c in df.columns if re.match(r"^y_pred\d+$", c)],
@@ -598,19 +597,21 @@ class Evaluator:
     def compare_predictions(
         self,
         predictions_path: Path | None = None,
-        metrics: list[str] = ["Accuracy", "AUC", "F1", "AP"]
+        metrics: list[str] | None = None
     ) -> pd.DataFrame:
         """
         Compares evaluation metrics across multiple trained models.
 
         Args:
             model_dir (Path | None, optional): Directory containing model subdirectories.
-            metrics (list[str], optional): Metrics to include in the comparison.
+            metrics (list[str] | None, optional): Metrics to include in the comparison.
+                Defaults to Accuracy, AUC, F1 and AP.
 
         Returns:
             pd.DataFrame: Model-wise metric comparison table.
         """
         predictions_path = predictions_path or self.out_dir
+        metrics = metrics or ["Accuracy", "AUC", "F1", "AP"]
 
         # Collects all (sub)folders containing prediction tables
         prediction_dirs: list[Path] = []
@@ -640,7 +641,7 @@ class Evaluator:
             raise ValueError(
                 f"No predictions loaded from {predictions_path}"
         )
-    
+
         self.vlog(
             f"Found [{INFO_CLR}]{len(prediction_dirs)}[/] prediction directories "
             f"in [{INFO_CLR}]{predictions_path}[/]"
@@ -650,7 +651,7 @@ class Evaluator:
         for model_name, predictions in predictions_dict.items():
             try:
                 model_metrics = self.calculate_metrics(predictions)
-                
+
                 row: dict[str, str | float] = {"model": model_name}
                 for metric in metrics:
                     if metric in model_metrics:
@@ -662,21 +663,21 @@ class Evaluator:
                             row[metric] = round(float(value), 2)
                     else:
                         row[metric] = "N/A"
-                
+
                 comparison_data.append(row)
-                
+
             except Exception as e:
                 self.vlog(f"Failed to evaluate [{INFO_CLR}]{model_name}[/]: {e}", LogLevel.WARNING)
                 continue
-        
+
         comparison_df = pd.DataFrame(comparison_data)
-        
+
         if not comparison_df.empty:
             self.vlog("Model Comparison:")
             self.vlog(comparison_df.to_string(index=False))
-        
+
         return comparison_df
-    
+
     # === Plotting === #
     def generate_plots(
         self,
@@ -701,11 +702,11 @@ class Evaluator:
             except Exception as e:
                 self.vlog(f"Failed to load metrics for {model_path.name}: {e}")
                 continue
-        
+
         if not combined_metrics:
             self.vlog("No valid model data found for generating plots")
             return
-        
+
         # Collect and execute all plotting methods
         plots = cast(
             dict[str, Figure], # Make sure the type annotation is correct
@@ -717,7 +718,7 @@ class Evaluator:
                 for method_name in dir(self)
                 if (
                     method_name.startswith('_plot_')
-                    and callable((plot_method := getattr(self, method_name)))
+                    and callable(plot_method := getattr(self, method_name))
                     and signature(plot_method).return_annotation == Figure
                 )
             }
@@ -741,59 +742,59 @@ class Evaluator:
     ) -> Figure:
         """Plot ROC curves for all models"""
         from sklearn.metrics import auc, roc_curve
-        
+
         plt.figure(figsize=figsize)
-        
+
         colors = plt.cm.get_cmap('Set1')(np.linspace(0, 1, len(combined_metrics)))
-        
+
         for i, (model_name, _) in enumerate(combined_metrics.items()):
             try:
                 # Load predictions for this model
                 model_path = self.out_dir / model_name
                 predictions = self.load_predictions(model_path)
-                
+
                 y_true = predictions["y_true"].astype(int)
                 num_classes = len(y_true.unique())
-                
+
                 # Get prediction probabilities
                 pred_columns = [column for column in predictions.columns if column.startswith("y_pred")]
                 ensemble_columns = [col for col in pred_columns if col.endswith("_ensemble")]
-                
+
                 if ensemble_columns:
                     prob_columns = [f"y_pred{i}_ensemble" for i in range(num_classes)]
                 else:
                     prob_columns = [f"y_pred{i}" for i in range(num_classes)]
-                
+
                 prob_matrix = predictions[prob_columns].values
-                
+
                 if num_classes == 2:
                     # Binary classification - single ROC curve
                     y_probs = prob_matrix[:, 1]  # Probabilities for positive class
-                    
+
                     fpr, tpr, _ = roc_curve(y_true, y_probs)
                     roc_auc = auc(fpr, tpr)
-                    
+
                     plt.plot(
-                        fpr, tpr, 
-                        color=colors[i], 
+                        fpr, tpr,
+                        color=colors[i],
                         linewidth=2,
                         label=f'{model_name} (AUC = {roc_auc:.3f})'
                     )
-                    
+
                 else:
                     # Multiclass - plot ROC curve for each class
                     for class_idx in range(num_classes):
                         y_true_binary = (y_true == class_idx).astype(int)
                         y_probs_class = prob_matrix[:, class_idx]
-                        
+
                         # Only plot if we have both classes
                         if len(y_true_binary.unique()) > 1:
                             fpr, tpr, _ = roc_curve(y_true_binary, y_probs_class)
                             roc_auc = auc(fpr, tpr)
-                            
+
                             # Use different line styles for different classes
                             line_style = ['-', '--', '-.', ':'][class_idx % 4]
-                            
+
                             plt.plot(
                                 fpr, tpr,
                                 color=colors[i],
@@ -801,14 +802,14 @@ class Evaluator:
                                 linewidth=2,
                                 label=f'{model_name} Class {class_idx} (AUC = {roc_auc:.3f})'
                             )
-                            
+
             except Exception as e:
                 self.vlog(f"Could not plot ROC curve for {model_name}: {e}", LogLevel.WARNING)
                 continue
-    
+
         # Plot diagonal line (random classifier)
         plt.plot([0, 1], [0, 1], 'k--', linewidth=1, alpha=0.5, label='Random')
-        
+
         plt.xlabel('False Positive Rate', fontsize=12)
         plt.ylabel('True Positive Rate', fontsize=12)
         plt.title('ROC Curves', fontsize=14, fontweight='bold')
@@ -816,7 +817,7 @@ class Evaluator:
         plt.grid(True, alpha=0.3)
         plt.xlim([0, 1])
         plt.ylim([0, 1])
-        
+
         plt.tight_layout()
         return plt.gcf()
 
@@ -843,11 +844,11 @@ class Evaluator:
                 list[Axes],
                 axes
             )
-        
+
         colors = plt.cm.get_cmap('Set1')(np.linspace(0, 1, len(data)))
         x_positions = np.arange(len(data.columns))
         model_names = list(data.columns)
-        
+
         for i, metric in enumerate(metrics):
             ax = axes[i]
             # Plot single metric
@@ -861,11 +862,11 @@ class Evaluator:
             )
 
             bar: Rectangle # Iterating over a BarContainer gives Rectangle objects
-            for bar, value in zip(bars, data.loc[metric]):
+            for bar, value in zip(bars, data.loc[metric], strict=True):
                 height = bar.get_height()
                 # Place actual value above bar
                 ax.text(
-                    bar.get_x() + bar.get_width()/2., 
+                    bar.get_x() + bar.get_width()/2.,
                     height + 0.005,
                     f'{value:.3f}',
                     ha='center',
@@ -883,7 +884,7 @@ class Evaluator:
                 ha="right",
                 rotation_mode="anchor"
             )
-            
+
             ax.set_title(f'{metric}', fontsize=12, fontweight='bold')
             ax.set_ylabel(metric, fontsize=10)
             ax.set_ylim(0, 1.1)
@@ -903,7 +904,7 @@ class Evaluator:
             for metric_name, metric_value in metrics.items():
                 if metric_name in ["ConfusionMatrix", "PerClassAccuracy"]:
                     continue
-                
+
                 plot_data.append({
                     'Metric': metric_name,
                     'Value': float(metric_value)
@@ -913,7 +914,7 @@ class Evaluator:
 
         # Create the plot
         plt.figure(figsize=figsize)
-        
+
         sns.boxplot(
             data=df,
             x='Metric',
@@ -931,13 +932,13 @@ class Evaluator:
             jitter=True,
             alpha=0.7
         )
-        
+
         plt.title('Metric Distributions', fontsize=14, fontweight='bold')
         plt.ylabel('Value', fontsize=12)
         plt.xlabel('Metric', fontsize=12)
         plt.ylim(0, 1.1)
         plt.grid(True, alpha=0.3, axis='y')
-        
+
         plt.tight_layout()
         return plt.gcf()
 
@@ -957,26 +958,26 @@ class Evaluator:
                         "Class": f"Class {class_idx}",
                         "Accuracy": acc
                     })
-        
+
         df = pd.DataFrame(data)
 
         # Create the plot
         plt.figure(figsize=figsize)
-        
+
         # Create a grouped bar plot
         ax = sns.barplot(data=df, x='Class', y='Accuracy', hue='Model', alpha=0.8)
-        
+
         plt.title('Per-Class Accuracy Comparison', fontsize=14, fontweight='bold')
         plt.ylabel('Accuracy', fontsize=12)
         plt.xlabel('Class', fontsize=12)
         plt.ylim(0, 1.1)
         plt.legend(title='Model', bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.grid(True, alpha=0.3, axis='y')
-        
+
         # Add value labels on bars
         for container in ax.containers:
             if isinstance(container, BarContainer):
                 ax.bar_label(container, fmt='%.2f', fontsize=9)
-        
+
         plt.tight_layout()
         return plt.gcf()

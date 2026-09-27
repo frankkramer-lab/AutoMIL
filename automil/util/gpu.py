@@ -20,7 +20,6 @@
 """
 GPU utility functions.
 """
-import subprocess
 
 import torch
 
@@ -48,7 +47,7 @@ def reserve_tensor_memory() -> float:
     # We can get the memory overhead by measuring
     # the total memory reserved before and after allocating a minimal tensor
     before = get_gpu_memory_used()
-    a = torch.FloatTensor(1).cuda()
+    _ = torch.FloatTensor(1).cuda()  # Kept alive until `after` is measured
     torch.cuda.synchronize() # Ensure the allocation is complete
     after = get_gpu_memory_used()
     return after - before

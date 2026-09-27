@@ -58,7 +58,14 @@ vips = [
 
 test = [
   "pytest",
-  "pytest-cov",
+  "pytest-cov>=6.1",  # markdown coverage reports
+]
+
+dev = [
+  "automil[test]",
+  "ruff",
+  "mypy",
+  "pre-commit",
 ]
 
 [project.urls]
@@ -72,6 +79,33 @@ automil = "automil.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["automil"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+# Lint only; formatting is left to the author (manual alignment is intentional)
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # Line length is not enforced without a formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]  # Package-level re-exports
+
+[tool.mypy]
+python_version = "3.11"
+files = ["automil"]
+# Heavy scientific dependencies (slideflow, torch, fastai, ...) ship without complete type information
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"

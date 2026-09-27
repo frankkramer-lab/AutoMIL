@@ -39,8 +39,7 @@ import slideflow as sf
 import torch
 from slideflow.slide import qc
 
-from .util import (COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR,
-                   RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel, get_vlog)
+from .util import COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR, RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel, get_vlog
 from .util.logging import render_kv_table
 from .util.pretiled import pretiled_to_tfrecords
 from .util.slide import calculate_average_mpp, get_mpp_from_slide
@@ -61,7 +60,7 @@ def get_unique_labels(annotations_file: Path, label_column: str) -> list[str]:
     annotations = pd.read_csv(annotations_file)
     return [str(label) for label in annotations[label_column].dropna().unique()]
 
-class Dataset():
+class Dataset:
     """Prepares and manages dataset sources for downstream pipeline stages.
 
     This class handles and executes all dataset-related preprocessing steps, including:
@@ -118,7 +117,7 @@ class Dataset():
             int: Tile size in pixels.
         """
         return self.resolution.tile_px
-    
+
     @cached_property
     def magnification(self) -> str:
         """Nominal magnification derived from the resolution preset.
@@ -128,7 +127,7 @@ class Dataset():
         """
 
         return self.resolution.magnification
-    
+
     @cached_property
     def mpp(self) -> float:
         """Computed microns-per-pixel (MPP) value.
@@ -200,7 +199,7 @@ class Dataset():
 
         self._extract_features(dataset)
         return dataset
-    
+
     def summary(self) -> None:
         rows = [
             ("Resolution Preset", self.resolution.name),
@@ -226,7 +225,7 @@ class Dataset():
             by_average (bool, optional): Compute MPP by calculating the average across slides. Defaults to False.
 
         Returns:
-            float: Appropriate MPP value for the given slides 
+            float: Appropriate MPP value for the given slides
         """
         global COMMON_MPP_VALUES
         mpp = None
@@ -249,7 +248,7 @@ class Dataset():
             self.vlog(f"Using default MPP for magnification [{INFO_CLR}]{self.magnification}: {mpp:.3f}[/]")
 
         return mpp
-    
+
     def _apply_label_filter(self, dataset: sf.Dataset) -> sf.Dataset:
         """Apply `label_map` filter to the given dataset
 
@@ -279,7 +278,7 @@ class Dataset():
 
             if ann_type != unique_type:
                 unique_labels = [ann_type(lbl) for lbl in unique_labels] # type: ignore
-        
+
         self.vlog(f"Filtering for unique labels {unique_labels}")
 
         return self.project.dataset(
@@ -287,7 +286,7 @@ class Dataset():
             dataset.tile_um,
             filters={"label": unique_labels},
         )
-        
+
     def _convert_pretiled(self) -> sf.Dataset:
         """Converts a pretiled dataset source to tfrecords. Tiling is skipped.
 
@@ -300,7 +299,7 @@ class Dataset():
         """
         if not self.project.annotations:
             raise RuntimeError("A project annotations file is required for pretiled datasets.")
-        
+
         elif self.slide_dir is None:
             raise ValueError("slide_dir must be provided when pretiled=True")
 
@@ -329,14 +328,14 @@ class Dataset():
 
         dataset.rebuild_index()
         dataset.update_manifest(force_update=True)
-        
+
         if len(dataset.manifest()) == 0:
             raise RuntimeError("Pretiled dataset conversion produced an empty manifest.")
 
         self.vlog(f"Pretiled dataset loaded with [{INFO_CLR}]{len(dataset.manifest())}[/] slides.")
 
         return dataset
-    
+
     def _extract_tiles(self, dataset: sf.Dataset) -> None:
         """Extracts tiles from a given dataset source. Optionally performs prior tiff conversion.
 
@@ -425,7 +424,7 @@ class Dataset():
                         mpp_override=self.mpp
                     )
                 except Exception as e:
-                    raise RuntimeError(f"Error extracting tiles for TIFF batch {batch_idx}: {e}")
+                    raise RuntimeError(f"Error extracting tiles for TIFF batch {batch_idx}: {e}") from e
 
             self.vlog(f"[{SUCCESS_CLR}]Finished TIFF conversion[/]")
 

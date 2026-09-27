@@ -2,7 +2,8 @@
 
 **Automated Machine Learning for Image Classification in Whole-Slide Imaging with Multiple Instance Learning.**
 
-[![Tests](https://github.com/frankkramer-lab/AutoMIL/actions/workflows/unittests.yaml/badge.svg)](https://github.com/frankkramer-lab/AutoMIL/actions/workflows/unittests.yaml)
+[![CI](https://github.com/frankkramer-lab/AutoMIL/actions/workflows/ci.yaml/badge.svg)](https://github.com/frankkramer-lab/AutoMIL/actions/workflows/ci.yaml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Docs](https://github.com/frankkramer-lab/AutoMIL/actions/workflows/deploy_docs.yml/badge.svg)](https://frankkramer-lab.github.io/AutoMIL/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE.md)

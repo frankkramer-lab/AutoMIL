@@ -73,7 +73,7 @@ pip install .[vips]
       `pyvips` is only the Python binding for the image processing library
       [libvips](https://www.libvips.org/), which must be installed separately
       on your system.
-      
+
       ```bash
       sudo apt install libvips
       ```

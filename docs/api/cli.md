@@ -11,4 +11,3 @@ The AutoMIL Command Line Interface (CLI) provides a user-friendly way to interac
 ::: automil.cli.evaluate
 
 ::: automil.cli.create_split
-

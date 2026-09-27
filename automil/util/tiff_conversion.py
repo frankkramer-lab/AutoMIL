@@ -21,9 +21,10 @@
 Utility functions for .png->.tiff conversion
 """
 
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Generator, TypeVar
+from typing import TypeVar
 
 from .constants import INFO_CLR
 from .logging import get_vlog
@@ -36,7 +37,7 @@ def convert_img_to_tiff(in_path: Path, out_path: Path) -> str:
     Args:
         in_path: Input path to image (.png, .jpg, ...)
         out_path: Output path where to save the converted TIFF
-    
+
     Returns:
         Error message in case of failure or an empty string in case of success.
     """
@@ -92,7 +93,7 @@ def batch_conversion(file_list: list[Path], out_folder: Path, verbose: bool = Tr
         file_list: List of file paths to convert
         out_folder: Path to output folder in which to save the TIFFs
         verbose: Whether to log progress messages
-    
+
     Returns:
         List of paths to converted TIFF files.
 
@@ -111,14 +112,14 @@ def batch_conversion(file_list: list[Path], out_folder: Path, verbose: bool = Tr
             vlog(f"[{INFO_CLR}]{out_path}[/] already exists. Skipping")
             out_list.append(out_path)
             continue
-        
+
         # Convert image to tiff
         if err := convert_img_to_tiff(in_path, out_path):
             vlog(f"Error while converting [{INFO_CLR}]{in_path}[/]: {err}")
         else:
             vlog(f"Successfully converted [{INFO_CLR}]{in_path.name}[/]")
             out_list.append(out_path)
-        
+
     return out_list
 
 def batch_conversion_concurrent(file_list: list[Path], out_folder: Path, verbose: bool = True) -> list[Path]:

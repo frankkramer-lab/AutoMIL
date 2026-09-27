@@ -133,7 +133,7 @@ class ResourceOptimizer:
             ):
                 high = mid - 1
                 continue
-            
+
             try:
                 peak = self.memory_estimator.estimate_peak_memory_mb(
                     batch_size=mid,

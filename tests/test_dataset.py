@@ -1,10 +1,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from automil.dataset import Dataset
-from automil.util import COMMON_MPP_VALUES, RESOLUTION_PRESETS
+from automil.util import RESOLUTION_PRESETS
 
 
 def test_dataset_initialization(mock_project, tmp_path):
@@ -50,7 +48,7 @@ def test_tfrecords_directory_paths(mock_project, tmp_path):
         slide_dir=tmp_path
     )
     assert dataset.tfrecords_dir == base / "tfrecords"
-    
+
     # Pretiled configuration
     dataset_pretiled = Dataset(
         project=mock_project,
@@ -60,7 +58,7 @@ def test_tfrecords_directory_paths(mock_project, tmp_path):
         slide_dir=tmp_path
     )
     assert dataset_pretiled.tfrecords_dir == base / "tfrecords" / "pretiled"
-    
+
     # TIFF conversion configuration
     dataset_tiff = Dataset(
         project=mock_project,

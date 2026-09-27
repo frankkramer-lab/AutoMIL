@@ -33,7 +33,6 @@ from typing import cast
 
 import pandas as pd
 import slideflow as sf
-import torch
 from fastai.callback.core import Callback
 from fastai.callback.tracker import EarlyStoppingCallback
 from fastai.learner import Learner
@@ -43,13 +42,11 @@ from slideflow.mil.eval import generate_attention_heatmaps
 from slideflow.mil.train import _fastai, _log_mil_params
 from slideflow.util import path_to_name
 
-from .estimator import adjust_batch_size
 from .memory import MemoryEstimator
 from .model import ModelManager
 from .resource_optimizer import ResourceOptimizer
 from .runtime import RuntimeContext
-from .util import (BATCH_SIZE, EPOCHS, INFO_CLR, LEARNING_RATE, ModelType,
-                   get_vlog)
+from .util import BATCH_SIZE, EPOCHS, INFO_CLR, LEARNING_RATE, ModelType, get_vlog
 from .util.bags import get_bag_avg_and_num_features
 from .util.logging import render_kv_table
 from .util.slide import get_num_slides
@@ -64,7 +61,7 @@ class Trainer:
         - Early stopping (via FastAI callback `EarlyStoppingCallback`)
         - Optional k-fold cross-validation
     """
-    
+
     def __init__(
         self,
         bags_path: Path,
@@ -163,17 +160,17 @@ class Trainer:
     def num_slides(self) -> int:
         """Number of slides in training dataset"""
         return get_num_slides(self.train_dataset)
-    
+
     @cached_property
     def bag_avg(self) -> int:
         """Average number of tiles per bag"""
         return get_bag_avg_and_num_features(self.bags_path)[0]
-    
+
     @cached_property
     def num_features(self) -> int:
         """Average number of features per tile"""
         return get_bag_avg_and_num_features(self.bags_path)[1]
-    
+
     @cached_property
     def adjusted_batch_size(self) -> int:
         """Optimal batch size adjusted for VRAM constraints"""
@@ -237,10 +234,10 @@ class Trainer:
         else:
             outdir = Path(self.config.prepare_training("label", exp_label=None, outdir=str(self.model_outdir)))
         self.vlog(f"Output directory: [{INFO_CLR}]{outdir}[/]")
-        
+
         # Prepare validation bags
         val_bags = self._prepare_validation_bags()
-        
+
         # Build learner with shape information
         result = build_fastai_learner(
             self.config,
@@ -259,10 +256,10 @@ class Trainer:
         else:
             learner = result
             n_in, n_out = 0, 0  # Shape info not available
-        
+
         # Save MIL parameters
         self._log_mil_params("label", learner, n_in, n_out, str(outdir))
-        
+
         # Add custom callbacks if needed
         callbacks = self._setup_callbacks()
         for callback in callbacks:
@@ -270,14 +267,14 @@ class Trainer:
 
         # Reset peak memory stats
         #self.runtime.reset_peak_memory()
-        
+
         # Train the model using fastai
         self.vlog(
             f"Starting training: {self.model.model_name} "
             f"(epochs={self.epochs}, batch_size={self.adjusted_batch_size})"
         )
         _fastai.train(learner, self.config)
-        
+
         # Generate validation predictions with attention
         self.vlog("Generating validation predictions...")
         from slideflow.mil import predict_mil
@@ -297,14 +294,14 @@ class Trainer:
             pred_out = outdir / 'predictions.parquet'
             df.to_parquet(pred_out)
             self.vlog(f"Predictions saved to [{INFO_CLR}]{pred_out}[/]")
-        
+
             # Calculate and display metrics
             self._run_metrics(df, "label", str(outdir))
-            
+
             # Export attention arrays
             if attention and isinstance(attention, dict):
                 self._export_attention(attention, val_bags, str(outdir))
-            
+
             # Generate attention heatmaps
             if attention and isinstance(attention, dict) and self.attention_heatmaps:
                 self._generate_heatmaps(val_bags, attention, str(outdir))
@@ -313,7 +310,7 @@ class Trainer:
 
         # Get actual memory usage during inference
         self.actual_mem_mb = self.runtime.peak_memory_mb()
-        
+
         self.vlog(f"Training completed: [{INFO_CLR}]{self.model.model_name}[/]")
         return learner
 
@@ -335,25 +332,25 @@ class Trainer:
         if base_model_label_override:
             outdir = outdir / base_model_label_override
         self.vlog(f"K-Fold output directory: [{INFO_CLR}]{outdir}[/]")
-        
+
         learners = []
         for fold in range(self.k):
-            self.vlog(f"=" * 50)
+            self.vlog("=" * 50)
             self.vlog(f"Training fold [{INFO_CLR}]{fold + 1}[/]/[{INFO_CLR}]{self.k}[/]")
-            self.vlog(f"=" * 50)
-            
+            self.vlog("=" * 50)
+
             # Create fold-specific paths and labels
             if base_model_label_override:
                 fold_label = f"{base_model_label_override}_fold{fold}"
             else:
                 fold_label = None
-            
+
             # Train this fold
             learner = self.train(
                 model_label_override=fold_label
             )
             learners.append(learner)
-        
+
         self.vlog(f"Completed [{INFO_CLR}]{self.k}[/]-fold training")
         return learners
 
@@ -383,7 +380,7 @@ class Trainer:
             ("Attention Heatmaps", self.attention_heatmaps),
             ("Device", str(self.runtime.device)),
         ]
-        
+
         self.vlog("[bold underline]Trainer Summary:[/]")
         self.vlog(render_kv_table(rows))
 
@@ -392,16 +389,16 @@ class Trainer:
         """Debug helper to inspect dataset labels"""
         train_ann = self.train_dataset.annotations
         val_ann = self.val_dataset.annotations
-        
+
         if train_ann is not None and val_ann is not None:
             self.vlog(f"Train labels: [{INFO_CLR}]{train_ann['label'].unique()}[/]")
             self.vlog(f"Train label types: [{INFO_CLR}]{[type(x) for x in train_ann['label'].unique()]}[/]")
-            self.vlog(f"Val labels: [{INFO_CLR}]{val_ann['label'].unique()}[/]")  
+            self.vlog(f"Val labels: [{INFO_CLR}]{val_ann['label'].unique()}[/]")
             self.vlog(f"Val label types: [{INFO_CLR}]{[type(x) for x in val_ann['label'].unique()]}[/]")
         else:
             self.vlog("WARNING: One or both datasets have no annotations")
 
-    
+
     def _prepare_validation_bags(self) -> list:
         """Simple helper method that emulates how slideflow generates validation feature bags.
 
@@ -413,7 +410,7 @@ class Trainer:
         val_bags = self.val_dataset.get_bags(str(self.bags_path))
         self.vlog(f"Found [{INFO_CLR}]{len(val_bags)}[/] validation bags")
         return val_bags.tolist()
-    
+
     def _log_mil_params(
         self,
         outcomes: str,
@@ -423,7 +420,7 @@ class Trainer:
         outdir: str
     ) -> None:
         """Simple helper method that emulates how slideflow logs and saves MIL parameters
-        
+
         Note:
             See `slideflow.mil._train_mil` for reference.
         Args:
@@ -442,13 +439,13 @@ class Trainer:
                 unique = None
         else:
             unique = None
-        
+
         # Use Slideflow's internal logging function
         _log_mil_params(self.config, outcomes, unique, str(self.bags_path), n_in, n_out, outdir)
-    
+
     def _run_metrics(self, df: pd.DataFrame, outcomes: str, outdir: str) -> None:
         """Simple helper method that emulates how slideflow caculates and logs metrics.
-        
+
         Note:
             See `slideflow.mil._train_mil` for reference.
 
@@ -459,13 +456,13 @@ class Trainer:
         """
         # Rename columns for metrics calculation
         utils.rename_df_cols(df, outcomes, categorical=self.config.is_classification(), inplace=True)
-        
+
         # Run metrics using Slideflow's method
         self.config.run_metrics(df, level='slide', outdir=outdir)
-    
+
     def _export_attention(self, attention: dict, val_bags: list, outdir: str) -> None:
         """Simple helper method that emulates how slideflow exports attention arrays.
-        
+
         Note:
             See `slideflow.mil._train_mil` for reference.
         Args:
@@ -475,12 +472,12 @@ class Trainer:
         """
         attention_dir = join(outdir, 'attention')
         bag_names = [path_to_name(b) for b in val_bags]
-        
+
         # Convert attention dict to list of arrays
         attention_arrays = list(attention.values())
         utils._export_attention(attention_dir, attention_arrays, bag_names)
         self.vlog(f"Attention arrays exported to [{INFO_CLR}]{attention_dir}[/]")
-    
+
     def _generate_heatmaps(self, val_bags: list, attention: dict, outdir: str) -> None:
         """Generate a heatmap using slideflow
 
@@ -497,7 +494,7 @@ class Trainer:
             attention=list(attention.values()),
         )
         self.vlog(f"Attention heatmaps generated in [{INFO_CLR}]{heatmap_dir}[/]")
-    
+
     def _estimate_model_size(self) -> float:
         """Estimate model size (reserved memory) in MB
 
@@ -510,7 +507,7 @@ class Trainer:
             self.num_features,
             self.num_classes
         )
-    
+
     def _build_config(self) -> TrainerConfig:
         """Builds a MIL model configuration using slideflow's `mil_config` method
 
@@ -524,10 +521,10 @@ class Trainer:
             epochs=self.epochs,
             batch_size=self.adjusted_batch_size,
         )
-        
+
         # Casting because mil_config should always return a TrainerConfig
         return cast(TrainerConfig, cfg)
-    
+
     def _setup_callbacks(self, additional_callbacks: list[Callback] | None = None) -> list[Callback]:
         """Sets up callbacks for the FastAI Learner, including an EarlyStopping Callback
 
@@ -538,7 +535,7 @@ class Trainer:
             list: List of callbacks
         """
         callbacks = []
-        
+
         # Early stopping
         if self.enable_early_stopping:
             callbacks.append(
@@ -548,5 +545,5 @@ class Trainer:
                 )
             )
         callbacks.extend(additional_callbacks if additional_callbacks else [])
-        
+
         return callbacks

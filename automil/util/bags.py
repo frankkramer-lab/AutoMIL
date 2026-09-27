@@ -51,5 +51,5 @@ def get_bag_avg_and_num_features(bags_dir: Path) -> tuple[int, int]:
 
     if not num_tiles:
         raise ValueError(f"No valid .pt feature bags found in {bags_dir}")
-    
+
     return (int(sum(num_tiles) / len(num_tiles)), num_features)

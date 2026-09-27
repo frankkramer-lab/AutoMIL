@@ -23,17 +23,16 @@ import sys
 import traceback
 import warnings
 from importlib.metadata import version
-
-# Suppressing warnings related to pkg_ressources and timm
-warnings.filterwarnings("ignore", category=UserWarning)
-warnings.filterwarnings("ignore", category=FutureWarning)
 from pathlib import Path
 
 import click
 
 # === Internal imports === #
-from .cli_help import (CREATE_SPLIT_HELP, EVALUATE_HELP, PREDICT_HELP,
-                       RUN_PIPELINE_HELP, TRAIN_HELP)
+from .cli_help import CREATE_SPLIT_HELP, EVALUATE_HELP, PREDICT_HELP, RUN_PIPELINE_HELP, TRAIN_HELP
+
+# Suppressing warnings related to pkg_ressources and timm
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 # === Setup === #
 CONTEXT_SETTINGS = {
@@ -53,7 +52,7 @@ def AutoMIL():
     pass
 
 @AutoMIL.command(
-    name="run-pipeline", 
+    name="run-pipeline",
     context_settings=CONTEXT_SETTINGS,
     no_args_is_help=True,
     help=RUN_PIPELINE_HELP
@@ -85,7 +84,7 @@ def AutoMIL():
     "-m", "--model",
     type=(model_choice := click.Choice([choice for choice in MODEL_CHOICES])),
     default=model_choice.choices[0],
-    help=f"Model type to train and evaluate"
+    help="Model type to train and evaluate"
 )
 @click.option(
     "-k", type=int, default=3,
@@ -121,7 +120,7 @@ def run_pipeline(
     ):
     """
     Execute the complete AutoMIL pipeline for whole slide image analysis.
-    
+
     This command runs the full AutoMIL workflow, including project setup,
     dataset preparation, model training with k-fold cross-validation,
     evaluation, and result visualization.
@@ -171,29 +170,29 @@ def run_pipeline(
 
         verbose (bool):
             Enables verbose logging output.
-      
+
     ### Examples
 
       Basic usage with default settings:
-        
+
         automil run-pipeline /data/slides /data/annotations.csv ./results
-      
+
       Multi-resolution training with verbose output:
 
         automil run-pipeline -r "Low,High" -v /data/slides /data/annotations.csv ./results
-      
+
       Custom model and k-fold settings:
 
         automil run-pipeline -m TransMIL -k 5 /data/slides /data/annotations.csv ./results
-      
+
       Skip tiling if tiles are pre-extracted:
 
         automil run-pipeline -p /data/slides /data/annotations.csv ./results
-      
+
       Custom column names in the annotation file:
 
         automil run-pipeline -pc "patient_name" -lc "diagnosis" -sc "slide_name" /data/slides /data/annotations.csv ./results
-      
+
       Provide a predefined train-test split:
 
         automil run-pipeline --split-file /data/split.json /data/slides /data/annotations.csv ./results
@@ -226,7 +225,7 @@ def run_pipeline(
         |-- slide1.svs
         |-- slide2.tiff
         |-- slide3.tiff
-    
+
     ??? Note "PNG Slide Handling"
         If slides are in PNG, AutoMIL will first convert them to TIFF for easier processing.
 
@@ -243,7 +242,7 @@ def run_pipeline(
         |    |-- tile_0_0.png
         |    |-- tile_0_1.png
         |    |-- ...
-    
+
     ??? Note "Slide name matching"
         Tile names are arbitrary but slide subdirectories must match the slide names in ANNOTATION_FILE.
 
@@ -267,11 +266,11 @@ def run_pipeline(
 
         project_dir/
         ├── bags/           # Extracted tile features
-        ├── models/         # Trained model checkpoints  
+        ├── models/         # Trained model checkpoints
         ├── ensemble/       # Ensemble predictions
         ├── annotations.csv # Processed annotations
         └── results.json    # Performance metrics
-    
+
     """
     import slideflow as sf
 
@@ -279,8 +278,7 @@ def run_pipeline(
     from .evaluation import Evaluator
     from .project import Project
     from .trainer import Trainer
-    from .util import (INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType,
-                       get_vlog)
+    from .util import INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
     from .util.backend import configure_image_backend, has_png_slides
     from .util.pretiled import is_input_pretiled
 
@@ -306,8 +304,9 @@ def run_pipeline(
 
         # === 1. Parsing === #
         # Parse given string resolutions into list of RESOLUTION_PRESETS
-        resolution_presets: list[RESOLUTION_PRESETS] = []
-        for res in [r.strip() for r in resolutions.split(',')]: resolution_presets.append(RESOLUTION_PRESETS[res])
+        resolution_presets: list[RESOLUTION_PRESETS] = [
+            RESOLUTION_PRESETS[res.strip()] for res in resolutions.split(',')
+        ]
         vlog(f"Using resolution presets: [{INFO_CLR}]{[preset.name for preset in resolution_presets]}[/]")
 
         # Parse the model type
@@ -342,7 +341,7 @@ def run_pipeline(
         slide_ids = project_setup.slide_ids
 
         project_setup.summary()
-        
+
         # === 4. Setup Dataset Sources ===
         # Determine if the slide_dir has pretiled slides
         if not is_pretiled: # is_pretiled == False means the flag was not set
@@ -378,7 +377,7 @@ def run_pipeline(
         )
         # Save base train split
         base_train = train
-        
+
         # === 6. Model Training === #
         for resolution in resolution_presets:
             vlog(f"Train/Test split for resolution preset [{INFO_CLR}]{resolution.name}[/]: "
@@ -421,7 +420,7 @@ def run_pipeline(
             save_path=Path(project.root) / "figures",
             model_paths=None
         )
-    
+
     except Exception as e:
         tb = traceback.format_exc()
         vlog(tb, LogLevel.ERROR)
@@ -461,7 +460,7 @@ def run_pipeline(
     "-m", "--model",
     type=(model_choice := click.Choice([choice for choice in MODEL_CHOICES])),
     default=model_choice.choices[0],
-    help=f"Model type to train and evaluate"
+    help="Model type to train and evaluate"
 )
 @click.option(
     "-k", type=int, default=3,
@@ -549,7 +548,7 @@ def train(
         automil train -m TransMIL -k 5 /data/slides /data/annotations.csv ./results
 
       Using pre-tiled slides::
-        
+
         automil train -p /data/slides /data/annotations.csv ./results
 
     ### Annotation file requirements
@@ -580,7 +579,7 @@ def train(
         |-- slide1.svs
         |-- slide2.tiff
         |-- slide3.tiff
-    
+
     ??? Note "PNG Slide Handling"
         If slides are in PNG, AutoMIL will first convert them to TIFF for easier processing.
 
@@ -597,7 +596,7 @@ def train(
         |    |-- tile_0_0.png
         |    |-- tile_0_1.png
         |    |-- ...
-    
+
     ??? Note "Slide name matching"
         Tile names are arbitrary but slide subdirectories must match the slide names in ANNOTATION_FILE.
 
@@ -621,11 +620,11 @@ def train(
 
         project_dir/
         ├── bags/           # Extracted tile features
-        ├── models/         # Trained model checkpoints  
+        ├── models/         # Trained model checkpoints
         ├── ensemble/       # Ensemble predictions
         ├── annotations.csv # Processed annotations
         └── results.json    # Performance metrics
-    
+
     """
 
     import slideflow as sf
@@ -633,8 +632,7 @@ def train(
     from .dataset import Dataset
     from .project import Project
     from .trainer import Trainer
-    from .util import (INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType,
-                       get_vlog)
+    from .util import INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
     from .util.backend import configure_image_backend, has_png_slides
     from .util.pretiled import is_input_pretiled
 
@@ -658,8 +656,9 @@ def train(
 
         # === 1. Parsing === #
         # Parse given string resolutions into list of RESOLUTION_PRESETS
-        resolution_presets: list[RESOLUTION_PRESETS] = []
-        for res in [r.strip() for r in resolutions.split(',')]: resolution_presets.append(RESOLUTION_PRESETS[res])
+        resolution_presets: list[RESOLUTION_PRESETS] = [
+            RESOLUTION_PRESETS[res.strip()] for res in resolutions.split(',')
+        ]
         vlog(f"Using resolution presets: [{INFO_CLR}]{[preset.name for preset in resolution_presets]}[/]")
 
         # Parse the model type
@@ -693,7 +692,7 @@ def train(
         slide_ids = project_setup.slide_ids
 
         project_setup.summary()
-        
+
         # === 4. Setup Dataset Sources ===
         # Determine if the slide_dir has pretiled slides
         if not is_pretiled: # is_pretiled == False means the flag was not set
@@ -719,7 +718,7 @@ def train(
             dataset.summary()
             datasets[resolution.name] = dataset.prepare_dataset_source()
             vlog(f"Dataset setup complete for resolution preset: [{INFO_CLR}]{resolution.name}[/]")
-        
+
         # === 5. Model Training === #
         for resolution in resolution_presets:
             dataset = datasets[resolution.name]
@@ -743,7 +742,7 @@ def train(
             )
             trainer.train_k_fold()
             trainer.summary()
-    
+
     except Exception as e:
         tb = traceback.format_exc()
         vlog(tb, LogLevel.ERROR)
@@ -761,7 +760,7 @@ def train(
 @click.argument("bags_dir",     type=click.Path(exists=True, file_okay=False))
 @click.argument("model_dir",    type=click.Path(exists=True, file_okay=False))
 @click.option(
-    "-o", "--output-dir", 
+    "-o", "--output-dir",
     type=click.Path(file_okay=True), default="predictions",
     help="Directory to which to save predictions (should either be .csv or .parquet)"
 )
@@ -926,7 +925,7 @@ def predict(
     )
     project.setup_project_scaffold()
     annotation_file = project.modified_annotations_file
-    
+
     # Create a minimal dataset (needed for prediction)
     dataset = sf.Dataset(
         slides=str(slide_dir),
@@ -961,7 +960,7 @@ def predict(
 @click.argument("bags_dir",     type=click.Path(exists=True, file_okay=False))
 @click.argument("model_dir",    type=click.Path(exists=True, file_okay=False))
 @click.option(
-    "-o", "--output-dir", 
+    "-o", "--output-dir",
     type=click.Path(file_okay=True), default="evaluation",
     help="Directory to which to save evaluation results"
 )
@@ -1128,7 +1127,7 @@ def evaluate(
     )
     project.setup_project_scaffold()
     annotation_file = project.modified_annotations_file
-    
+
     # Create a minimal dataset (needed for prediction)
     dataset = sf.Dataset(
         slides=str(slide_dir),
@@ -1258,7 +1257,7 @@ def create_split(
             splits=str(output_file),
             read_only=read_only
         )
-    
+
     except Exception as e:
         tb = traceback.format_exc()
         vlog(tb, LogLevel.ERROR)
@@ -1273,9 +1272,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-

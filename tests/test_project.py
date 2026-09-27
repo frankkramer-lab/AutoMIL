@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import cast
 from unittest.mock import patch
 
 import pandas as pd

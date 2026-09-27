@@ -28,7 +28,7 @@ import torch
 
 from .model import ModelManager
 from .runtime import RuntimeContext
-from .util import ModelType, get_vlog
+from .util import ModelType
 
 
 class MemoryEstimator:
@@ -70,7 +70,6 @@ class MemoryEstimator:
         Returns:
             float: Peak memory usage in MB.
         """
-        vlog = get_vlog(True)
         # Tuple of relevant parameters to use in populating peak memory cache
         key_vector = (self.model_type, batch_size, bag_size, input_dim, num_classes)
 
@@ -146,7 +145,7 @@ class MemoryEstimator:
             else:
                 loss.backward()
                 optimizer.step()
-            
+
             # Capture peak memory (reserved)
             peak_mem = self.runtime.peak_memory_mb()
 

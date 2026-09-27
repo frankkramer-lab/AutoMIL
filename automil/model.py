@@ -30,8 +30,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from slideflow.mil.models import Attention_MIL, TransMIL
-from slideflow.mil.models.bistro.transformer import \
-    Attention as BistroTransformer
+from slideflow.mil.models.bistro.transformer import Attention as BistroTransformer
 from slideflow.util import log as slideflow_log
 
 from .runtime import RuntimeContext
@@ -47,7 +46,7 @@ def create_model_instance(
 
     This method instantiates a model corresponding to the provided
     :class:`ModelType` with the specified input and output dimensions
-    
+
     Args:
         model_type: The ModelType enum
         input_dim: Input feature dimension
@@ -62,11 +61,11 @@ def create_model_instance(
             case ModelType.Attention_MIL:
                 model_cls = Attention_MIL
                 return model_cls(n_feats=input_dim, n_out=n_out)
-            
+
             case ModelType.TransMIL:
                 model_cls = TransMIL
                 return model_cls(n_feats=input_dim, n_out=n_out)
-            
+
             case ModelType.BistroTransformer:
                 model_cls = BistroTransformer
                 return model_cls(dim=input_dim)
@@ -158,16 +157,15 @@ class ModelManager:
     }
 
     def __init__(self, model_type: ModelType) -> None:
-        f"""Instantiates a ModelManager object
+        """Instantiates a ModelManager object
 
         Args:
-            model_type (ModelType): Type of model to instantiate. Can be one of: {
-                [model.name for model in ModelType]
-            }
+            model_type (ModelType): Type of model to instantiate. One of
+                ``Attention_MIL``, ``TransMIL`` or ``BistroTransformer``.
         """
         self.model_type = model_type
         self.config = self._MODEL_CONFIGS[model_type]
-    
+
     @property
     def slideflow_name(self) -> str:
         """
@@ -218,14 +216,14 @@ class ModelManager:
             ) from e
 
     def create_dummy_input(
-        self, 
-        batch_size: int, 
-        tiles_per_bag: int, 
+        self,
+        batch_size: int,
+        tiles_per_bag: int,
         input_dim: int,
         runtime: RuntimeContext
     ) -> tuple:
         """Creates an appropriate dummy input for the model
-        
+
         Dummy input tensors can be used for a variety of tasks. Primarily they are used
         to perform `dry runs`, for example to measure the memory reservation of a model instance
 
@@ -233,7 +231,7 @@ class ModelManager:
             batch_size: Number of samples in batch
             tiles_per_bag: Number of tiles per bag
             input_dim: Feature dimension
-            
+
         Returns:
             Tuple of tensors to pass to model forward()
         """
@@ -249,7 +247,7 @@ class ModelManager:
                 # BistroTransformer expects only input (no lens)
                 dummy_input = torch.randn(batch_size, tiles_per_bag, input_dim, device=runtime.device)
                 return (dummy_input,)
-            
+
 
     def validate_hyperparameters(self, lr: float, batch_size: int, max_tiles_per_bag: int) -> dict[str, float | int]:
         """
@@ -278,18 +276,18 @@ class ModelManager:
 
         if max_tiles_per_bag > self.config.max_tiles_per_bag:
             suggestions["max_tiles_per_bag"] = self.config.max_tiles_per_bag
-        
+
         return suggestions
 
     @classmethod
     def compare_models(cls) -> str:
         """Generates a comparison table for all available models
-        
+
         Returns:
             str: A comparison table as string
         """
         from tabulate import tabulate
-        
+
         table = []
         for model_type, config in cls._MODEL_CONFIGS.items():
             table.append([
@@ -299,10 +297,10 @@ class ModelManager:
                 config.max_tiles_per_bag,
                 f"{config.min_lr:.0e}-{config.max_lr:.0e}",
             ])
-        
+
         headers = [
-            "Model Type", "Slideflow Name", "Max Batch Size", 
+            "Model Type", "Slideflow Name", "Max Batch Size",
             "Max Tiles Per Bag", "LR Range"
         ]
-        
+
         return tabulate(table, headers=headers, tablefmt="fancy_outline")

@@ -40,7 +40,7 @@ def is_input_pretiled(slide_dir: Path, slide_ids: list[str] | None = None) -> bo
     `slide_dir` is considered pretiled, if the following conditions are met:
         1. `slide_dir` contains a subdirectory for each slide (Ideally named after the slide ID)
         2. Each slide subdirectory contains loose image tiles (.tif, .tiff, .png, .svs)
-    
+
     Example structure:
     ```
         slide_dir/
@@ -63,10 +63,10 @@ def is_input_pretiled(slide_dir: Path, slide_ids: list[str] | None = None) -> bo
     tile_formats = [".png", ".svs", ".tiff", ".tif"]
     if not slide_dir.is_dir() or not slide_dir.exists():
         return False
-    
+
     # Collect all subdirectories
     slide_subdirs = [entry for entry in slide_dir.iterdir() if entry.is_dir()]
-    
+
     # Check if there even are subdirectories
     if not slide_subdirs:
         return False
@@ -137,7 +137,7 @@ def pretiled_to_tfrecords(
         if tfrecord_path.exists() and not overwrite:
             vlog(f"[{INFO_CLR}]{tfrecord_path}[/] already exists. Skipping.")
             continue
-        
+
         extensions = [".png", ".svs", ".tif", ".tiff"]
         tile_paths = sorted([tile for tile in slide_dir.iterdir() if tile.suffix in extensions])
         if not tile_paths:

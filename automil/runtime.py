@@ -25,9 +25,9 @@ responsible for handling and managing runtime variables, such as the pytorch dev
 It is also responsible for providing memory management utilities for the  given device, including measuring and resetting memory stats.
 """
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator
 
 import torch
 
@@ -80,7 +80,7 @@ class RuntimeContext:
             obj: Object to move to runtime device
         """
         return obj.to(self.device)
-    
+
     @contextmanager
     def autocast(self) -> Iterator[None]:
         """

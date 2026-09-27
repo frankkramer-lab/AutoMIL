@@ -23,11 +23,11 @@ Contains help page text for the AutoMIL CLI.
 
 RUN_PIPELINE_HELP = """
     Execute the complete AutoMIL pipeline for whole slide image analysis.
-    
+
     \b
     `run-pipeline` executes the entire AutoMIL workflow, encompassing:
       [1] Project setup and configuration
-      [2] Dataset preparation and tile extraction  
+      [2] Dataset preparation and tile extraction
       [3] Model training with k-fold cross-validation
       [4] Model evaluation and ensemble creation
       [5] Results comparison and visualization
@@ -35,26 +35,26 @@ RUN_PIPELINE_HELP = """
     \b
     ARGUMENTS:
       SLIDE_DIR        Directory containing whole slide images (.svs, .tiff, etc.)
-      ANNOTATION_FILE  .csv file with slide/patient annotations and labels  
+      ANNOTATION_FILE  .csv file with slide/patient annotations and labels
       PROJECT_DIR      Output directory for all results and models
-    
+
     \b
     EXAMPLES:
       # Basic usage with default settings
       automil run-pipeline /data/slides /data/annotations.csv ./results
-      
+
       # Multi-resolution training with verbose output
       automil run-pipeline -r "Low,High" -v /data/slides /data/annotations.csv ./results
-      
+
       # Custom model and k-fold settings
       automil run-pipeline -m TransMIL -k 5 /data/slides /data/annotations.csv ./results
-      
+
       # Skip tiling if tiles are pre-extracted
       automil run-pipeline -p /data/slides /data/annotations.csv ./results
-      
+
       # Custom column names in the annotation file
       automil run-pipeline -pc "patient_name" -lc "diagnosis" -sc "slide_name" /data/slides /data/annotations.csv ./results
-      
+
       # Provide a predefined train-test split
       automil run-pipeline --split-file /data/split.json /data/slides /data/annotations.csv ./results
 
@@ -119,7 +119,7 @@ RUN_PIPELINE_HELP = """
     OUTPUT STRUCTURE:
       project_dir/
       ├── bags/           # Extracted tile features
-      ├── models/         # Trained model checkpoints  
+      ├── models/         # Trained model checkpoints
       ├── ensemble/       # Ensemble predictions
       ├── annotations.csv # Processed annotations
       └── results.json    # Performance metrics
@@ -127,33 +127,33 @@ RUN_PIPELINE_HELP = """
 
 TRAIN_HELP = """
     Train a single or multiple MIL models on a given dataset.
-    
+
     \b
     `train` sets up a project and dataset source, then trains MIL models using k-fold cross-validation:
       [1] Project setup and configuration
-      [2] Dataset preparation and tile extraction  
+      [2] Dataset preparation and tile extraction
       [3] Model training with k-fold cross-validation
 
     \b
     ARGUMENTS:
       SLIDE_DIR        Directory containing whole slide images (.svs, .tiff, etc.)
-      ANNOTATION_FILE  CSV file with slide/patient annotations and labels  
+      ANNOTATION_FILE  CSV file with slide/patient annotations and labels
       PROJECT_DIR      Output directory for all results and models
-    
+
     \b
     EXAMPLES:
       # Basic usage with default settings
       automil train /data/slides /data/annotations.csv ./results
-      
+
       # Multi-resolution training with verbose output
       automil train -r "Low,High" -v /data/slides /data/annotations.csv ./results
-      
+
       # Custom model and k-fold settings
       automil train -m TransMIL -k 5 /data/slides /data/annotations.csv ./results
-      
+
       # Skip tiling if tiles are pre-extracted
       automil train -p /data/slides /data/annotations.csv ./results
-      
+
       # Custom column names in the annotation file
       automil train -pc "patient_name" -lc "diagnosis" -sc "slide_name" /data/slides /data/annotations.csv ./results
 
@@ -204,7 +204,7 @@ TRAIN_HELP = """
     OUTPUT STRUCTURE:
       project_dir/
       ├── bags/           # Extracted tile features
-      ├── models/         # Trained model checkpoints  
+      ├── models/         # Trained model checkpoints
       ├── ensemble/       # Ensemble predictions
       ├── annotations.csv # Processed annotations
       └── results.json    # Performance metrics
@@ -232,10 +232,10 @@ PREDICT_HELP = """
 
       # Generate predictions with a single model
       automil predict /data/slides /data/annotations.csv /data/bags /data/models/model_1 -v
-    
+
       # Generate predictions with a single model (override column names)
       automil predict -pc "patient_id" -lc "outcome" -sc "slide_id" /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./predictions
-    
+
     \b
     EXPECTED MODEL DIRECTORY STRUCTURE:
         MODEL_DIR can refer to a single model directory (containing one .pth file) or
@@ -251,7 +251,7 @@ PREDICT_HELP = """
             |-- model_2/
             |    |-- best_valid.pth
             |    |...
-    
+
     \b
     ANNOTATION REQUIREMENTS:
       ANNOTATION_FILE must be a CSV file containing at least the following columns:
@@ -268,7 +268,7 @@ PREDICT_HELP = """
         001,001_2,0
         002,002,1
         003,003,1
-    
+
     \b
     OUTPUT DIRECTORY FORMAT:
         OUTPUT_DIR should be a directory path.
@@ -299,10 +299,10 @@ EVALUATE_HELP = """
 
       # Evaluate multiple models (generates one output file per model)
       automil evaluate /data/slides /data/annotations.csv /data/bags /data/models/ -v
-    
+
       # Evaluate a single model (override column names)
-      automil evaluate -pc "patient_id" -lc "outcome" -sc "slide_id" /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./results      
-    
+      automil evaluate -pc "patient_id" -lc "outcome" -sc "slide_id" /data/slides /data/annotations.csv /data/bags /data/models/model_1 -o ./results
+
     \b
     EXPECTED MODEL DIRECTORY STRUCTURE:
         MODEL_DIR can refer to a single model directory (containing one .pth file) or
@@ -318,7 +318,7 @@ EVALUATE_HELP = """
             |-- model_2/
             |    |-- best_valid.pth
             |    |...
-    
+
     \b
     ANNOTATION REQUIREMENTS:
       ANNOTATION_FILE must be a CSV file containing at least the following columns:
@@ -354,7 +354,7 @@ CREATE_SPLIT_HELP = """
     \b
     ARGUMENTS:
       SLIDE_DIR        Directory containing whole slide images (.svs, .tiff, etc.)
-      ANNOTATION_FILE  .csv file with slide/patient annotations and labels  
+      ANNOTATION_FILE  .csv file with slide/patient annotations and labels
 
     \b
     EXAMPLES:

@@ -4,8 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from automil.util.backend import (configure_image_backend, has_png_slides,
-                                  is_ome_tiff)
+from automil.util.backend import configure_image_backend, has_png_slides, is_ome_tiff
 
 
 # === Helper Methods === #
@@ -88,6 +87,3 @@ def test_backend_raises_error_when_ome_tiff_present(tmp_path):
                 needs_png_conversion=False,
                 verbose=False,
             )
-    
-
-

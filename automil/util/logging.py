@@ -21,9 +21,9 @@
 Project wide logging utilities for AutoMIL.
 """
 import time
+from collections.abc import Callable, Sequence
 from functools import wraps
 from io import StringIO
-from typing import Callable
 
 from rich.box import HEAVY_HEAD
 from rich.console import Console
@@ -51,7 +51,7 @@ def get_vlog(verbose: bool) -> Callable:
 
 # --- Tables ---#
 def render_kv_table(
-    rows: list[tuple[str, str]],
+    rows: Sequence[tuple[str, object]],
     *,
     title: str | None = None,
     width: int = 160,

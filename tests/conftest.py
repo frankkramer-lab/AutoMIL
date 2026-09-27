@@ -19,7 +19,7 @@ def project_factory(tmp_path):
             mock_project.sources = {}
             mock_project.annotations = None
             return mock_project
-        
+
         elif kind == "base":
             return AutoMIL_Project(
                 project_dir=tmp_path / "project",
@@ -29,9 +29,9 @@ def project_factory(tmp_path):
                 label_column="label",
                 **kwargs
             )
-        
+
         raise ValueError(f"Unknown project kind: {kind}")
-    
+
     return _create
 
 @pytest.fixture

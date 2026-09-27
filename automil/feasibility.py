@@ -24,7 +24,6 @@ This module provides the :func:`automil.feasibility.is_feasible` method,
 which is responsible for checking a given set of parameters against sensible limits to see if
 a configuration is feasible
 """
-from slideflow.util import log
 
 from .memory import MemoryEstimator
 from .model import ModelManager
@@ -68,7 +67,7 @@ def is_feasible(
 
     if batch_size > model_manager.config.max_batch_size:
         violations.append("batch_size_exceeds_model_limit")
-    
+
     # === Training constraints === #
     steps = dataset_size // batch_size
     if steps < min_steps_per_epoch:
@@ -88,7 +87,7 @@ def is_feasible(
 
         if peak >= target:
             violations.append("exceeds_memory_limit")
-    
+
     feasible = (len(violations) == 0)
     return feasible, violations
 
@@ -118,7 +117,7 @@ def is_feasible_cheap(
 
     if batch_size > model_manager.config.max_batch_size:
         violations.append("batch_size_exceeds_model_limit")
-    
+
     # === Training constraints === #
     steps = dataset_size // batch_size
     if steps < min_steps_per_epoch:

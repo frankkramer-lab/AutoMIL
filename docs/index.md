@@ -42,5 +42,5 @@ A typical AutoMIL project has the following layout:
     project_dir/
     |-- tfrecords/ # Directory containing .tfrecords generated during preprocessing
     |-- models/ # Directory containing trained model checkpoints
-    |-- bags/ # Directory containing generated bags 
+    |-- bags/ # Directory containing generated bags
     |-- ensemble/ # Directory containing ensemble predictions

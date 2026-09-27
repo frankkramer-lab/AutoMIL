@@ -1,10 +1,8 @@
 from pathlib import Path
 
 import pandas as pd
-import pytest
 from slideflow.mil.models import Attention_MIL, TransMIL
-from slideflow.mil.models.bistro.transformer import \
-    Attention as BistroTransformer
+from slideflow.mil.models.bistro.transformer import Attention as BistroTransformer
 
 from automil.dataset import get_unique_labels
 from automil.util import RESOLUTION_PRESETS, ModelType

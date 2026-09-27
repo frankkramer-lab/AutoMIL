@@ -2,7 +2,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pandas as pd
-import pytest
 
 from automil.model import ModelManager
 from automil.trainer import Trainer
@@ -140,4 +139,3 @@ def test_config_is_built_via_mil_config(
             epochs=10,
             batch_size=8,
         )
-

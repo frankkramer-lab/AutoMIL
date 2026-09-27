@@ -21,7 +21,6 @@
 Utility funtions for exttracting slide metadata using OpenSlide: https://openslide.org/
 """
 from pathlib import Path
-from typing import Optional
 
 import openslide
 from slideflow.dataset import Dataset as sfDataset
@@ -38,7 +37,7 @@ def get_num_slides(dataset: sfDataset) -> int:
     """
     return len(dataset.slides())
 
-def get_slide_magnification(slide_path: str | Path) -> Optional[str]:
+def get_slide_magnification(slide_path: str | Path) -> str | None:
     """Retrieve magnification from slide properties or estimate using microns per pixel.
 
     Args:
@@ -59,8 +58,9 @@ def get_slide_magnification(slide_path: str | Path) -> Optional[str]:
     # Estimation (or opening slide) failed
     except Exception:
         return None
+    return None
 
-def get_lowest_magnification(slide_dir: Path) -> Optional[str]:
+def get_lowest_magnification(slide_dir: Path) -> str | None:
     """Return the lowest magnification from slides in a directory.
 
     Args:
@@ -78,7 +78,7 @@ def get_lowest_magnification(slide_dir: Path) -> Optional[str]:
                 continue  # Skip invalid magnifications
     return str(min(magnifications)) if magnifications else None
 
-def get_mpp_from_slide(slide_path: Path) -> Optional[float]:
+def get_mpp_from_slide(slide_path: Path) -> float | None:
     """Extract microns per pixel (MPP) from a slide file using OpenSlide.
 
     Args:
@@ -95,8 +95,8 @@ def get_mpp_from_slide(slide_path: Path) -> Optional[float]:
             return float(mpp_x)
     except (openslide.OpenSlideError, ValueError, TypeError, KeyError):
         return None
-    
-def calculate_average_mpp(slide_dir: Path, return_rounded: bool = True) -> Optional[float]:
+
+def calculate_average_mpp(slide_dir: Path, return_rounded: bool = True) -> float | None:
     """Calculate the average microns per pixel (MPP) from all slides in a directory.
 
     Args:
@@ -110,13 +110,14 @@ def calculate_average_mpp(slide_dir: Path, return_rounded: bool = True) -> Optio
     for slide_path in slide_dir.iterdir():
         if (mpp := get_mpp_from_slide(slide_path)):
             mpp_values.append(mpp)
-    if not mpp_values: return None
+    if not mpp_values:
+        return None
     average_mpp = sum(mpp_values) / len(mpp_values)
     if return_rounded and average_mpp is not None:
         return round(average_mpp, 2)
     return average_mpp
 
-def get_slide_properties(slide_path: str) -> Optional[dict]:
+def get_slide_properties(slide_path: str) -> dict | None:
     """Retrieve slide properties as a dictionary.
 
     Args:

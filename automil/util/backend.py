@@ -20,7 +20,6 @@
 # automil/utils/backend.py
 
 import os
-import platform
 from pathlib import Path
 
 from .constants import INFO_CLR
@@ -78,7 +77,7 @@ def configure_image_backend(
 
     In the following cases, the backend is configured to use libvips instead:
     - The slide directory contains any PNG slides | TIFF conversion is needed
-    - The slide directory contains any OME-TIFF slides (which cucim does not support)   
+    - The slide directory contains any OME-TIFF slides (which cucim does not support)
 
     Args:
         slide_dir (Path): The slide directory

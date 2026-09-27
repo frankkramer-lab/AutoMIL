@@ -23,8 +23,7 @@ Project level enums for AutoMIL.
 from enum import Enum
 
 from slideflow.mil.models import Attention_MIL, TransMIL
-from slideflow.mil.models.bistro.transformer import \
-    Attention as BistroTransformer
+from slideflow.mil.models.bistro.transformer import Attention as BistroTransformer
 
 
 # Logging Levels
@@ -44,11 +43,11 @@ class ModelType(Enum):
         """The associated string name to pass to slideflow"""
         name_mapping = {
             Attention_MIL: "attention_mil",
-            TransMIL: "transmil", 
+            TransMIL: "transmil",
             BistroTransformer: "bistro.transformer"
         }
         return name_mapping[self.value]
-    
+
     @property
     def model_class(self):
         """The associated torch module"""
@@ -65,7 +64,7 @@ class RESOLUTION_PRESETS(Enum):
     def tile_px(self) -> int:
         """Tile size in pixels"""
         return self.value[0]
-    
+
     @property
     def magnification(self) -> str:
         """Tile magnification level"""

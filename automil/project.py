@@ -28,9 +28,9 @@ along with an underlying Slideflow project instance.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from functools import cached_property
 from pathlib import Path
-from typing import Iterable
 
 import pandas as pd
 import slideflow as sf
@@ -64,7 +64,7 @@ def contains_columns(data: pd.DataFrame | Path, columns: Iterable[str], return_m
     if return_missing:
         return set(columns) - set(data.columns)
     else:
-        return set(columns).issubset(set(data.columns))   
+        return set(columns).issubset(set(data.columns))
 
 class Project:
     """
@@ -157,7 +157,7 @@ class Project:
                 "Label map has not been set up yet. Call setup_project_scaffold() first."
             )
         return self._label_map
-    
+
     @property
     def slide_ids(self) -> list[str]:
         """List of unique slide identifiers from the modified annotations file.
@@ -215,7 +215,7 @@ class Project:
                 annotations=str(self.modified_annotations_file),
             )
         return self.project
-    
+
     def summary(self) -> None:
         """Prints a simple summary of the Project Instance in a tabular format"""
         vlog = self.vlog
@@ -292,7 +292,7 @@ class Project:
         annotations.to_csv(out_path, index=True)
 
         if not out_path.exists():
-            raise IOError(f"Failed to write annotations file: {out_path}")
+            raise OSError(f"Failed to write annotations file: {out_path}")
 
         if annotations.empty:
             self.vlog("Warning: annotation file written but is empty.")
@@ -308,7 +308,8 @@ class Project:
         """
         annotations = self.modified_annotations
         labels = annotations["label"].unique()
-        
+        label_map: dict[str, float] | list[str]
+
         # Transform labels to float values and store the mapping
         if self.transform_labels:
             label_map = {label: float(i) for i, label in enumerate(sorted(labels))}
@@ -317,5 +318,5 @@ class Project:
         else:
             # Store unique labels as sorted list
             label_map = sorted(labels.astype(str).tolist())
-        
+
         return label_map
