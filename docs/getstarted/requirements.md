@@ -32,7 +32,6 @@ The following Python packages are required and are installed automatically when 
 ### Visualization and Interactive Analysis
 - `matplotlib`
 - `seaborn`
-- `imgui`
 - `ipython`
 
 ### Whole-Slide Image Processing and MIL Utilities

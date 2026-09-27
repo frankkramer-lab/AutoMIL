@@ -1,32 +1,72 @@
-# AutoMIL 
-## Automated Machine Learning for Image Classification in Whole-Slide Imaging with Multiple Instance Learning
+# AutoMIL
+
+**Automated Machine Learning for Image Classification in Whole-Slide Imaging with Multiple Instance Learning.**
+
+[![Tests](https://github.com/frankkramer-lab/AutoMIL/actions/workflows/unittests.yaml/badge.svg)](https://github.com/frankkramer-lab/AutoMIL/actions/workflows/unittests.yaml)
+[![Docs](https://github.com/frankkramer-lab/AutoMIL/actions/workflows/deploy_docs.yml/badge.svg)](https://frankkramer-lab.github.io/AutoMIL/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE.md)
 
 AutoMIL is a flexible, open-source, end-to-end pipeline for training and evaluating Multiple Instance Learning (MIL) models for image classification on whole-slide images (WSIs).
 It provides a modular command-line interface (CLI) that enables straightforward usage and adaptation to diverse WSI datasets.
 In addition to the CLI, AutoMIL exposes a Python API for programmatic use, allowing users to build their own custom workflows.
 
+```bash
+automil run-pipeline ./slides ./annotations.csv ./project -v
+```
+
+![AutoMIL pipeline](docs/assets/Pipeline_Graph.png)
+
+**[Documentation](https://frankkramer-lab.github.io/AutoMIL/)** · **[Installation](https://frankkramer-lab.github.io/AutoMIL/getstarted/installation/)** · **[Quickstart](https://frankkramer-lab.github.io/AutoMIL/getstarted/quickstart/)**
+
 ## Features
 
-* A well documented and easy to use Command Line Interface
-* A high-level python API for custom development
-* Modular project structure for easy adaptation to new datasets
-* Support for multiple MIL algorithms and model architectures
-* Adaptability to various WSI formats and datasets, including large image sizes and pretiled slides
+- **End-to-end CLI:** The command `run-pipeline` covers everything from raw slides to an evaluation report. `train`, `evaluate` and `predict` run individual stages, while `create-split` handles dataset splitting.
+- **Memory-aware batch sizing:** the largest batch size that fits the available GPU memory is found automatically (see [How it works](#how-it-works)).
+- **Multiple MIL architectures:** [Attention-MIL](https://arxiv.org/abs/1802.04712), [TransMIL](https://arxiv.org/abs/2106.00908) and a Bistro transformer, selectable with `-m`.
+- **Resolution presets:** tile size and magnification are chosen from named presets (`Ultra_Low` to `Ultra`) and models can be trained can be trained on several presets in one run.
+- **Flexible input:** standard WSI formats (`.svs`, `.tiff`, OME-TIFF, …), PNG slides via automatic TIFF conversion, and pretiled datasets.
+- **Evaluation and interpretability:** metrics, ROC curves, model comparison plots, ensemble predictions and attention heatmaps.
+- **Python API:** every CLI stage is backed by a class (`Project`, `Dataset`, `Trainer`, `Evaluator`, …) for custom workflows.
 
-## Resources
+## How it works
 
-- [Website](https://frankkramer-lab.github.io/AutoMIL/)
-- [Github Repository](https://github.com/frankkramer-lab/AutoMIL)
-- [Installation Guide](https://frankkramer-lab.github.io/AutoMIL/getstarted/installation/)
-- [Quickstart Guide](https://frankkramer-lab.github.io/AutoMIL/getstarted/quickstart/)
+AutoMIL builds on [Slideflow](https://slideflow.dev/) for slide I/O and tile extraction, and on [fastai](https://github.com/fastai/fastai) for training. AutoMIL adds automation around these components, handling tasks such as resource-aware hyperparameter selection, feature extraction, and end-to-end pipeline management.
+
+**1. Project and dataset setup.** Annotations are validated and normalised, so custom patient, slide and label column names are supported. The average Microns-Per-Pixel (MPP) is read from the slides, and each resolution preset is translated into a physical tile size in µm, which keeps tiling consistent across scanners.
+
+**2. Slide backend selection.** Slideflow reads slides with cuCIM by default. AutoMIL checks the input and switches to libvips when it is needed (OME-TIFF files, or PNG slides that must be converted to TIFF).
+
+**3. Feature bags.** Tiles are embedded with a pretrained pathology foundation model (CTransPath) and stored as one feature bag per slide.
+
+**4. Resource-aware hyperparameters.** Choosing a batch size for MIL is awkward because each sample is a bag of hundreds to thousands of tiles. AutoMIL's `ResourceOptimizer`:
+
+- instantiates the selected model and runs a real forward and backward pass on dummy bags of the dataset's average bag size, to measure peak GPU memory (`MemoryEstimator`);
+- doubles the batch size until the measured peak exceeds 90% of free memory, then binary-searches the boundary;
+- rejects candidates that break dataset or model constraints (a batch larger than the dataset, too few steps per epoch, model-specific limits) using a cheap feasibility check before any GPU work is done;
+- caches measurements, so repeated probes are free.
+
+Training runs with automatic mixed precision and early stopping. On CPU-only machines it falls back to safe defaults.
+
+**5. Training and evaluation.** Models are trained with k-fold cross-validation. The `Evaluator` then computes Accuracy, AUC, AP and F1 per model and for the ensemble, and writes comparison plots and attention heatmaps.
+
+<p align="center">
+  <img src="docs/assets/roc_curves.png" alt="Example ROC curves produced by automil evaluate" width="480">
+  <br>
+  <em>Example of an evaluation plot generated by <code>automil evaluate</code> (quickstart demo run on a 100-slide TCGA lung subset).</em>
+</p>
 
 ## Installation
 
-### Requirements
-    - Python 3.11+
-    - Cuda-compatible GPU
-    - cucim or libvips
-    - Linux
+**Requirements:** Linux, Python 3.11+ and a CUDA-capable GPU or CPU are required. AutoMIL depends on Slideflow and cuCIM, which are developed for Linux. libvips (`pip install .[vips]`) is optional and needed only for OME-TIFF or PNG input.
+
+```bash
+git clone https://github.com/frankkramer-lab/AutoMIL.git
+cd AutoMIL
+pip install .
+```
+
+See the [installation guide](https://frankkramer-lab.github.io/AutoMIL/getstarted/installation/) for details.
 
 ### Setup
 
@@ -42,29 +82,18 @@ This will clone the projects source code inside a new directory called `./automi
 pip install .
 ```
 
-## Quick Start
+## Quickstart
 
-### Preparing your Dataset
-
-AutoMIL expects your WSI dataset to consist of slide images in one of many supported formats (.tiff, .svs, .tif etc) and a file containing slide-level label information 
-
-A minimal dataset consists of:
-
-- A directory containing slide images
-- A .csv metadata file with slide-level annotations
-
-Example directory structure:
+A dataset is a directory of slides plus a CSV file with one label per slide:
 
 ```text
 dataset/
 ├── slides/
-│   ├── case_001.tiff
-│   ├── case_002.tiff
-│   └── case_003.tiff
+│   ├── case_001.svs
+│   ├── case_002.svs
+│   └── case_003.svs
 └── annotations.csv
 ```
-
-With annotations.csv:
 
 ```csv
 patient,slide,label
@@ -73,25 +102,39 @@ patient,slide,label
 003,case_003,1
 ```
 
-### Training a Model
-
-To train a basic [Attention_MIL](https://arxiv.org/abs/1802.04712) model on the dataset, run the `automil train` command with default parameters:
+Train (5-fold cross-validation, TransMIL):
 
 ```bash
-automil train ./dataset/slides ./dataset/annotations.csv results -v
+automil train ./dataset/slides ./dataset/annotations.csv ./project -m TransMIL -k 5 -v
 ```
 
-Using the verbose flag `-v` will provide you with additional information displayed in stdout, giving you more verbose info and error messages and is recommended
-
-The trained model will be saved in the `results/` directory under `results/models/`.
-
-
-### Evaluate the trained model
-
-To evaluate the trained model on the same dataset, run the `automil evaluate` command:
+Evaluate the trained models:
 
 ```bash
-automil evaluate ./results/models/00000_attentionmil_label/ ./dataset/slides ./dataset/annotations.csv -o ./evaluation -v
+automil evaluate ./dataset/slides ./dataset/annotations.csv ./project/bags ./project/models -o ./project/evaluation -v
 ```
 
-This will create an evaluation report inside the `./evaluation` directory, containing metrics and visualizations of the model performance.
+Or do both in one step with `automil run-pipeline`. Run `automil <command> --help` for all options, including custom column names (`-pc`, `-lc`, `-sc`), multi-resolution runs (`-r "Low,High"`) and predefined train/test splits (`--split-file`).
+
+The [quickstart guide](https://frankkramer-lab.github.io/AutoMIL/getstarted/quickstart/) walks through a full run on a public TCGA lung cancer subset.
+
+## Project structure
+
+```text
+automil/
+├── cli.py                  # Click-based command line interface
+├── project.py              # Project scaffolding and annotation handling
+├── dataset.py              # Resolution presets, tiling and feature bag generation
+├── model.py                # Model registry and model-specific constraints
+├── trainer.py              # k-fold training on top of fastai
+├── resource_optimizer.py   # Memory-aware batch size search
+├── memory.py               # Empirical peak-memory measurement
+├── feasibility.py          # Dataset and model constraint checks
+├── runtime.py              # Device and mixed-precision handling
+├── evaluation.py           # Metrics, ensembles and plots
+└── util/                   # Slide backends, pretiled input, TIFF conversion, logging
+```
+
+## License
+
+AutoMIL is licensed under the [GNU General Public License v3.0](LICENSE.md).
