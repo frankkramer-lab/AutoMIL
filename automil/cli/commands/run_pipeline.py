@@ -21,13 +21,21 @@
 import sys
 import traceback
 from pathlib import Path
+
 import click
 
-from ..help import RUN_PIPELINE_HELP
 from ..constants import CONTEXT_SETTINGS
-from ..core import (train_arguments, column_overwrite_options, train_options,
-                    preprocessing_options, run_pipeline_options, dataset_options, verbose_option
+from ..core import (
+    column_overwrite_options,
+    dataset_options,
+    preprocessing_options,
+    run_pipeline_options,
+    train_arguments,
+    train_options,
+    verbose_option,
 )
+from ..help import RUN_PIPELINE_HELP
+
 
 @click.command(
     name="run-pipeline",
@@ -61,7 +69,7 @@ def run_pipeline(
     ):
     """
     Execute the complete AutoMIL pipeline for whole slide image analysis.
-    
+
     This command runs the full AutoMIL workflow, including project setup,
     dataset preparation, model training with k-fold cross-validation,
     evaluation, and result visualization.
@@ -111,29 +119,29 @@ def run_pipeline(
 
         verbose (bool):
             Enables verbose logging output.
-      
+
     ### Examples
 
       Basic usage with default settings:
-        
+
         automil run-pipeline /data/slides /data/annotations.csv ./results
-      
+
       Multi-resolution training with verbose output:
 
         automil run-pipeline -r "Low,High" -v /data/slides /data/annotations.csv ./results
-      
+
       Custom model and k-fold settings:
 
         automil run-pipeline -m TransMIL -k 5 /data/slides /data/annotations.csv ./results
-      
+
       Skip tiling if tiles are pre-extracted:
 
         automil run-pipeline -p /data/slides /data/annotations.csv ./results
-      
+
       Custom column names in the annotation file:
 
         automil run-pipeline -pc "patient_name" -lc "diagnosis" -sc "slide_name" /data/slides /data/annotations.csv ./results
-      
+
       Provide a predefined train-test split:
 
         automil run-pipeline --split-file /data/split.json /data/slides /data/annotations.csv ./results
@@ -166,7 +174,7 @@ def run_pipeline(
         |-- slide1.svs
         |-- slide2.tiff
         |-- slide3.tiff
-    
+
     ??? Note "PNG Slide Handling"
         If slides are in PNG, AutoMIL will first convert them to TIFF for easier processing.
 
@@ -183,7 +191,7 @@ def run_pipeline(
         |    |-- tile_0_0.png
         |    |-- tile_0_1.png
         |    |-- ...
-    
+
     ??? Note "Slide name matching"
         Tile names are arbitrary but slide subdirectories must match the slide names in ANNOTATION_FILE.
 
@@ -207,11 +215,11 @@ def run_pipeline(
 
         project_dir/
         ├── bags/           # Extracted tile features
-        ├── models/         # Trained model checkpoints  
+        ├── models/         # Trained model checkpoints
         ├── ensemble/       # Ensemble predictions
         ├── annotations.csv # Processed annotations
         └── results.json    # Performance metrics
-    
+
     """
     import slideflow as sf
 
@@ -219,8 +227,7 @@ def run_pipeline(
     from automil.evaluation import Evaluator
     from automil.project import Project
     from automil.trainer import Trainer
-    from automil.util import (INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType,
-                       get_vlog)
+    from automil.util import INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
     from automil.util.backend import configure_image_backend, has_png_slides
     from automil.util.pretiled import is_input_pretiled
 
@@ -241,8 +248,9 @@ def run_pipeline(
 
         # === 1. Parsing === #
         # Parse given string resolutions into list of RESOLUTION_PRESETS
-        resolution_presets: list[RESOLUTION_PRESETS] = []
-        for res in [r.strip() for r in resolutions.split(',')]: resolution_presets.append(RESOLUTION_PRESETS[res])
+        resolution_presets: list[RESOLUTION_PRESETS] = [
+            RESOLUTION_PRESETS[res.strip()] for res in resolutions.split(',')
+        ]
         vlog(f"Using resolution presets: [{INFO_CLR}]{[preset.name for preset in resolution_presets]}[/]")
 
         # Parse the model type
@@ -277,7 +285,7 @@ def run_pipeline(
         slide_ids = project_setup.slide_ids
 
         project_setup.summary()
-        
+
         # === 4. Setup Dataset Sources ===
         # Determine if the slide_dir has pretiled slides
         if not is_pretiled: # is_pretiled == False means the flag was not set
@@ -315,7 +323,7 @@ def run_pipeline(
         )
         # Save base train split
         base_train = train
-        
+
         # === 6. Model Training === #
         for resolution in resolution_presets:
             vlog(f"Train/Test split for resolution preset [{INFO_CLR}]{resolution.name}[/]: "
@@ -358,7 +366,7 @@ def run_pipeline(
             save_path=Path(project.root) / "figures",
             model_paths=None
         )
-    
+
     except Exception as e:
         tb = traceback.format_exc()
         vlog(tb, LogLevel.ERROR)

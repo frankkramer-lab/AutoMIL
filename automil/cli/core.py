@@ -18,8 +18,9 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.      #
 #==============================================================================#
 """Core utilities and decorators for the AutoMIL CLI"""
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 # === External libraries === #
 import click
@@ -169,7 +170,7 @@ def preprocessing_options(f):
 def dataset_options(f: Callable[..., Any]) -> Callable[..., Any]:
     """Dataset related and specific options."""
     f = click.option(
-        "-p", 
+        "-p",
         "--is-pretiled",
         is_flag=True,
         help="Indicates that the input format is pretiled slides"

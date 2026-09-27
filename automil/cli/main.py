@@ -20,32 +20,25 @@
 """The entry point CLI for running AutoMIL"""
 # === External libraries === #
 import warnings
-# Suppressing warnings related to pkg_ressources and timm
-warnings.filterwarnings("ignore", category=UserWarning)
-warnings.filterwarnings("ignore", category=FutureWarning)
+from importlib.metadata import version
 
 import click
 
 # === Internal imports === #
+from .commands.create_split import create_split
+from .commands.evaluate import evaluate
+from .commands.predict import predict
 from .commands.run_pipeline import run_pipeline
 from .commands.train import train
-from .commands.predict import predict
-from .commands.evaluate import evaluate
-from .commands.create_split import create_split
+from .constants import CONTEXT_SETTINGS
 
-# === Setup === #
-CONTEXT_SETTINGS = {
-    "help_option_names": ["-h", "--help"],
-    "max_content_width": 120,
-    "show_default": True,
-}
-
-RESOLUTION_CHOICES = ["Ultra_Low", "Low", "High", "Ultra"]
-MODEL_CHOICES = ["Attention_MIL", "TransMIL", "BistroTransformer"]
+# Suppressing warnings related to pkg_ressources and timm
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 # === CLI === #
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.version_option(version="1.0.0", prog_name="AutoMIL")
+@click.version_option(version=version("automil"), prog_name="AutoMIL")
 def AutoMIL():
     """AutoMIL: Automated Multiple Instance Learning for Whole Slide Images."""
     pass
@@ -62,9 +55,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-

@@ -132,7 +132,7 @@ def create_split(
             splits=str(output_file),
             read_only=read_only
         )
-    
+
     except Exception as e:
         tb = traceback.format_exc()
         vlog(tb, LogLevel.ERROR)

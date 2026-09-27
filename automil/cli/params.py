@@ -20,12 +20,14 @@
 # automil/cli/custom_click_params.py
 
 # --- Internal libraries --- #
-from typing import Any, Callable, Iterable
 import importlib
+from collections.abc import Callable, Iterable
+from typing import Any
 
 # --- External libraries --- #
 import click
 from click import shell_completion
+
 
 class LazyChoice(click.ParamType):
     """Custom click parameter for lazily-loaded choice options from an import statement.
@@ -50,7 +52,7 @@ class LazyChoice(click.ParamType):
             ...
         }
     ```
-    
+
     A ``LazyChoice`` can be configured to expose these keys as CLI options
     without importing Slideflow at startup:
 
@@ -58,7 +60,7 @@ class LazyChoice(click.ParamType):
 
         StainNormalizerType = LazyChoice(
             import_path="slideflow.norm",
-            attr="StainNormalizer",
+            attribute="StainNormalizer",
             transform=lambda cls: cls.normalizers.keys(),
         )
     ```
@@ -81,8 +83,8 @@ class LazyChoice(click.ParamType):
         self.import_path = import_path
         self.attribute = attribute
         self.transform = transform if transform else (lambda x: x)
-        self._choices = None
-    
+        self._choices: tuple[str, ...] | None = None
+
     @property
     def choices(self):
         return self._load_choices()
@@ -90,7 +92,8 @@ class LazyChoice(click.ParamType):
     def _load_choices(
         self
     ) -> Iterable[str]:
-        if self._choices is not None: return self._choices
+        if self._choices is not None:
+            return self._choices
 
         module = importlib.import_module(
             self.import_path
@@ -101,7 +104,7 @@ class LazyChoice(click.ParamType):
             self.attribute
         )):
             raise ImportError(f"{module.__name__} does not have a {self.attribute} attribute")
-        
+
         values = self.transform(attribute)
         self._choices = tuple(values)
         return self._choices
@@ -127,5 +130,3 @@ class LazyChoice(click.ParamType):
             shell_completion.CompletionItem(c)
             for c in choices if c.startswith(incomplete)
         ]
-    
-        

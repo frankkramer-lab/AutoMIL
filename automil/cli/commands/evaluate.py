@@ -25,8 +25,7 @@ from pathlib import Path
 import click
 
 from ..constants import CONTEXT_SETTINGS
-from ..core import (column_overwrite_options, output_dir_option,
-                    predict_arguments, verbose_option)
+from ..core import column_overwrite_options, output_dir_option, predict_arguments, verbose_option
 from ..help import EVALUATE_HELP
 
 
@@ -190,7 +189,7 @@ def evaluate(
     )
     project.setup_project_scaffold()
     annotation_file = project.modified_annotations_file
-    
+
     # Create a minimal dataset (needed for prediction)
     dataset = sf.Dataset(
         slides=str(slide_dir),

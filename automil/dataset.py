@@ -37,7 +37,6 @@ from pathlib import Path
 import pandas as pd
 import slideflow as sf
 import torch
-from slideflow.slide import qc
 
 from .util import COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR, RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel, get_vlog
 from .util.logging import render_kv_table
