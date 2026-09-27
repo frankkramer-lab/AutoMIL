@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]  # Two trailing spaces are a line break in Markdown
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]  # mkdocs.yml uses custom !!python tags
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=2000]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.1
+    hooks:
+      - id: mypy
+        pass_filenames: false
+        args: [--config-file=pyproject.toml]
