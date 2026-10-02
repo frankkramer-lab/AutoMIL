@@ -17,3 +17,7 @@ results/
 project_*/
 model_test/
 split.json
+
+# Test coverage
+.coverage
+htmlcov/

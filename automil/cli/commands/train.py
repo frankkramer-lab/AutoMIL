@@ -330,4 +330,4 @@ def train(
         tb = traceback.format_exc()
         vlog(tb, LogLevel.ERROR)
         vlog(f"Error: {e}", LogLevel.ERROR)
-        return
+        sys.exit(1)
