@@ -603,7 +603,8 @@ class Evaluator:
         Compares evaluation metrics across multiple trained models.
 
         Args:
-            model_dir (Path | None, optional): Directory containing model subdirectories.
+            predictions_path (Path | None, optional): Directory containing model subdirectories with predictions.
+                Defaults to the evaluator's output directory.
             metrics (list[str] | None, optional): Metrics to include in the comparison.
                 Defaults to Accuracy, AUC, F1 and AP.
 
