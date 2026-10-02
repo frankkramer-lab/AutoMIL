@@ -176,28 +176,28 @@ def evaluate(
 
     vlog(f"Evaluating models in: [{INFO_CLR}]{model_dir}[/]")
 
-    # Setup output folder as project (modifies annotation file)
-    project = Project(
-        Path(output_dir),
-        Path(annotation_file),
-        Path(slide_dir),
-        patient_column,
-        label_column,
-        slide_column,
-        transform_labels=False,
-        verbose=verbose,
-    )
-    project.setup_project_scaffold()
-    annotation_file = project.modified_annotations_file
-
-    # Create a minimal dataset (needed for prediction)
-    dataset = sf.Dataset(
-        slides=str(slide_dir),
-        annotations=str(annotation_file)
-    )
-
-    # Evaluate models
     try:
+        # Setup output folder as project (modifies annotation file)
+        project = Project(
+            Path(output_dir),
+            Path(annotation_file),
+            Path(slide_dir),
+            patient_column,
+            label_column,
+            slide_column,
+            transform_labels=False,
+            verbose=verbose,
+        )
+        project.setup_project_scaffold()
+        annotation_file = project.modified_annotations_file
+
+        # Create a minimal dataset (needed for prediction)
+        dataset = sf.Dataset(
+            slides=str(slide_dir),
+            annotations=str(annotation_file)
+        )
+
+        # Evaluate models
         evaluator = Evaluator(
             dataset,
             model_dir,
@@ -213,4 +213,4 @@ def evaluate(
         tb = traceback.format_exc()
         vlog(tb, LogLevel.ERROR)
         vlog(f"Error: {e}", LogLevel.ERROR)
-        return
+        sys.exit(1)
