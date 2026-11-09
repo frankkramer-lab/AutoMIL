@@ -53,6 +53,21 @@ class ModelType(Enum):
         """The associated torch module"""
         return self.value
 
+class TileBackendType(Enum):
+    """Tile extraction backend used when preparing a dataset (implemented in `automil.tiling`).
+
+    Selected with `Dataset(tiler=...)` or the hidden `--tiler` option of the `train` and `run-pipeline`
+    commands. Both backends write slideflow-compatible tfrecords and index files, so feature extraction and
+    training don't depend on the choice.
+
+    Attributes:
+        Slideflow: Slideflow's own tile extraction (`sf.Dataset.extract_tiles`). The default.
+        Slideforge: Experimental extraction via the Rust `slideforge` binding. Requires
+            `pip install automil[slideforge]` (built from source, needs a Rust toolchain) and reads SVS slides only.
+    """
+    Slideflow  = "slideflow"
+    Slideforge = "slideforge"
+
 # Resolution Presets for extracting dataset tiles (specifies tile size and magnification level)
 class RESOLUTION_PRESETS(Enum):
     Ultra_Low = (2_000, "5x")

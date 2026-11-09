@@ -165,6 +165,14 @@ def preprocessing_options(f):
         help="Stain normalization method to utilize (e.g macenko, reinhard etc.)"
     )(f)
 
+    f = click.option(
+        "--tiler",
+        type=click.Choice(["Slideflow", "Slideforge"]),
+        default="Slideflow",
+        hidden=True,
+        help="[Experimental] Tile extraction backend"
+    )(f)
+
     return f
 
 def dataset_options(f: Callable[..., Any]) -> Callable[..., Any]:

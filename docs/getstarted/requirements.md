@@ -39,7 +39,7 @@ The following Python packages are required and are installed automatically when 
 - `openslide-bin`
 - `slideflow`
 - `nystrom-attention`
-- `cucim`
+- `cucim-cu13`
 
 ### General Utilities and Command Line Interface
 - `click`

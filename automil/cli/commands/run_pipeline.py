@@ -63,6 +63,7 @@ def run_pipeline(
     split_file:      str | None,
     tissue_detection: str,
     stain_normalizer: str,
+    tiler:            str,
     transform_labels: bool,
     is_pretiled:      bool,
     verbose:          bool
@@ -227,7 +228,7 @@ def run_pipeline(
     from automil.evaluation import Evaluator
     from automil.project import Project
     from automil.trainer import Trainer
-    from automil.util import INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
+    from automil.util import INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType, TileBackendType, get_vlog
     from automil.util.backend import configure_image_backend, has_png_slides
     from automil.util.pretiled import is_input_pretiled
 
@@ -308,6 +309,7 @@ def run_pipeline(
                 bags_dir=Path(project_dir) / "bags",
                 is_pretiled=is_pretiled,
                 tiff_conversion=tiff_conversion,
+                tiler=TileBackendType[tiler],
                 verbose=verbose
             )
             dataset.summary()

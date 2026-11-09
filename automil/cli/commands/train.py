@@ -59,6 +59,7 @@ def train(
     model:           str,
     tissue_detection: str,
     stain_normalizer: str,
+    tiler:            str,
     k:               int,
     is_pretiled:      bool,
     transform_labels: bool,
@@ -213,7 +214,7 @@ def train(
     from automil.dataset import Dataset
     from automil.project import Project
     from automil.trainer import Trainer
-    from automil.util import INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType, get_vlog
+    from automil.util import INFO_CLR, RESOLUTION_PRESETS, LogLevel, ModelType, TileBackendType, get_vlog
     from automil.util.backend import configure_image_backend, has_png_slides
     from automil.util.pretiled import is_input_pretiled
 
@@ -296,6 +297,7 @@ def train(
                 bags_dir=Path(project_dir) / "bags",
                 is_pretiled=is_pretiled,
                 tiff_conversion=tiff_conversion,
+                tiler=TileBackendType[tiler],
                 verbose=verbose
             )
             dataset.summary()

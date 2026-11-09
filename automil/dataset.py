@@ -38,7 +38,17 @@ import pandas as pd
 import slideflow as sf
 import torch
 
-from .util import COMMON_MPP_VALUES, FEATURE_EXTRACTOR, INFO_CLR, RESOLUTION_PRESETS, SUCCESS_CLR, LogLevel, get_vlog
+from .tiling import get_tile_backend
+from .util import (
+    COMMON_MPP_VALUES,
+    FEATURE_EXTRACTOR,
+    INFO_CLR,
+    RESOLUTION_PRESETS,
+    SUCCESS_CLR,
+    LogLevel,
+    TileBackendType,
+    get_vlog,
+)
 from .util.logging import render_kv_table
 from .util.pretiled import pretiled_to_tfrecords
 from .util.slide import calculate_average_mpp, get_mpp_from_slide
@@ -84,6 +94,7 @@ class Dataset:
         bags_dir:  Path | None = None,
         is_pretiled:  bool = False,
         tiff_conversion: bool = False,
+        tiler: TileBackendType = TileBackendType.Slideflow,
         verbose: bool = True
         ) -> None:
         """Initialize a Dataset manager.
@@ -96,6 +107,7 @@ class Dataset:
             bags_dir (Path | None, optional): Output directory for generated feature bags.
             is_pretiled (bool, optional): Whether the input slides are already tiled.
             tiff_conversion (bool, optional): Whether slides should be converted to TIFF before tiling.
+            tiler (TileBackendType, optional): Tile extraction backend (``Slideforge`` is experimental).
             verbose (bool, optional): Enable verbose logging.
         """
         self.project = project
@@ -110,6 +122,7 @@ class Dataset:
         self.label_map = label_map
         self.is_pretiled = is_pretiled
         self.tiff_conversion = tiff_conversion
+        self.tiler = tiler
 
         self.vlog = get_vlog(verbose)
 
@@ -213,6 +226,7 @@ class Dataset:
             ("Tile Size (µm)", f"{self.tile_um:.2f}µm"),
             ("Pretiled Input", self.is_pretiled),
             ("TIFF Conversion", self.tiff_conversion),
+            ("Tiler", self.tiler.name),
         ]
 
         self.vlog("[bold underline]Dataset Summary[/]")
@@ -355,11 +369,11 @@ class Dataset:
         """
         # Default Case: Normal tile extraction
         if not self.tiff_conversion:
-            self.vlog(f"Extracting tiles at [{INFO_CLR}]{self.magnification} | tile={self.tile_px}[/]")
-            dataset.extract_tiles(
-                qc=self.tissue_detection,
-                normalizer=self.stain_normalizer,
-                report=True,
+            self.vlog(f"Extracting tiles at [{INFO_CLR}]{self.magnification} | tile={self.tile_px} | tiler={self.tiler.name}[/]")
+            get_tile_backend(self.tiler).extract(
+                dataset,
+                tissue_detection=self.tissue_detection,
+                stain_normalizer=self.stain_normalizer,
             )
             return
 
