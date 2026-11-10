@@ -2,7 +2,7 @@
 
 Status: experimental (`exp/slideforge-tiling`). Measured: 2026-11-07/08.
 
-This document summarizes the results of a full benchmark run comparing the two tiling backends (default slideflow and experimental slideforge) with regards to speed, memory usage and tile quality. Preliminary evaluation indicate that slideforge is the faster option while featuring similar tile quality, although these are not definitive results (see [Limitations])
+This document summarizes the results of a full benchmark run comparing the two tiling backends (default slideflow and experimental slideforge) with regards to speed, memory usage and tile quality. Preliminary evaluation indicate that slideforge is the faster option while featuring similar tile quality, although these are not definitive results (see [Limitations](#limitations)).
 
 ## Summary
 
@@ -11,7 +11,8 @@ This document summarizes the results of a full benchmark run comparing the two t
 - **CPU:** slideforge used 1.6–3.7× less CPU time in all 12 settings.
 - **Scaling:** slideflow seems to barely speed up beyond 4 threads. slideforge kept getting faster up to 16 threads.
 - **Same tiles:** without tissue detection, both produce the same grid (Jaccard 1.0) with nearly identical pixels
-  (mean SSIM ≥ 0.99). With tissue detection, 94–96% of tiles agree at the calibrated `min_tissue_fraction=0.4`.
+  (mean SSIM ≥ 0.99). With tissue detection, 94–96% of tiles agree at the calibrated `min_tissue_fraction=0.4`
+  (mean SSIM 0.98). slideforge also keeps gray scan artifacts that slideflow drops (see [Tile selection](#tile-selection)).
 - **Exception:** at Low resolution with tissue detection on and one thread, slideflow was faster (19.6 s vs. 24.4 s),
   because it used about 2 cores even with `num_threads=1`.
 - **Not tested yet:** Differences in stain normalization (on by default in AutoMIL), whether models trained on slideforge tiles perform
@@ -110,11 +111,34 @@ Compared with `compare.py`, which matches tiles by location and computes pixel s
 | | Tile overlap (Jaccard) | Mean SSIM of matched tiles |
 |---|---|---|
 | Tissue detection off | 1.00 on all three slides | 0.991–0.996 |
-| Tissue detection on, `min_tissue_fraction=0.4` (overall) | 0.94 (High), 0.96 (Low) | — |
-| Tissue detection on, `min_tissue_fraction=0.5` (per slide, before calibration) | 0.87–0.98 | 0.980–0.982 |
+| Tissue detection on, `min_tissue_fraction=0.4`, High | 0.948 overall (0.92–0.99 per slide) | 0.981 (0.980–0.982) |
+| Tissue detection on, `min_tissue_fraction=0.4`, Low | 0.959 overall (0.95–0.98 per slide) | 0.981 (0.980–0.982) |
 
-The pixel differences without tissue detection (mean absolute difference 0.4–0.9 of 255) come from the two
-implementations' different resizing and JPEG encoding.
+The pixel differences come from the two implementations' different resizing and JPEG encoding. The mean absolute
+difference is 0.4–0.9 of 255 without tissue detection and 2.3–3.2 with it, most likely because the tiles kept without
+tissue detection are mostly uniform background, where both encoders agree.
+
+![Matched tiles at High resolution](figures/high_tiles.jpg)
+
+![Matched tiles at Low resolution](figures/low_tiles.jpg)
+
+For each slide, the figures show the matched tile pair with the median difference among 50 random pairs, so they are
+typical, not best-case, examples. The differences have no visible structure apart from slightly larger values along
+edges and in fine texture.
+
+### Tile selection
+
+The maps show which tiles only one backend kept (tissue detection on, `min_tissue_fraction=0.4`):
+
+![Tile selection at High resolution](figures/high_selection.png)
+
+![Tile selection at Low resolution](figures/low_selection.png)
+
+Most disagreements are single tiles along the tissue border, where the two signals put the edge in slightly different
+places. One pattern is systematic: on CMU-3 at High resolution, 117 of the 254 tiles that only slideforge kept lie
+along the slide's top edge, where the scan has a gray band with no tissue. Grayscale detection counts dark gray as
+tissue, while slideflow's saturation signal ignores it. Switching slideforge to a saturation-based signal would remove
+this kind of artifact.
 
 ### Calibrating `min_tissue_fraction`
 
@@ -145,7 +169,16 @@ pip install -e ".[slideforge]"
 python benchmarks/tiling/bench.py --slides <slides> --out <out> \
     --resolution High --resolution Low --threads 1 --threads 4 --threads 16 --repeats 3
 python benchmarks/tiling/calibrate.py --slides <slides> --out <out>/calibration --resolution High --resolution Low
+
+# Figures: keep the tfrecords of one run per backend, then draw from them (High shown, Low uses --tile-um 500)
+python benchmarks/tiling/bench.py --slides <slides> --out <out>/figures --resolution High --resolution Low \
+    --threads 16 --tissue --repeats 1 --no-warmup --keep-tfrecords last
+python benchmarks/tiling/figures.py <slideflow_tfrecords_dir> <slideforge_tfrecords_dir> --slides <slides> \
+    --tile-um 149 --mpp 0.499 --out benchmarks/tiling/figures --prefix high --title "High resolution"
 ```
+
+The figures and the equivalence numbers at `min_tissue_fraction=0.4` come from a separate run on 2026-11-10 with the
+same code and versions. It selected exactly the same number of tiles as the benchmark runs.
 
 See [README.md](README.md) for `compare.py` and the other options. Slide checksums (SHA-256):
 

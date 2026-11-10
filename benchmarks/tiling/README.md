@@ -30,6 +30,10 @@ python benchmarks/tiling/compare.py <slideflow_tfrecords_dir> <slideforge_tfreco
 
 # 3. Calibration: sweep slideforge's min_tissue_fraction against slideflow's Otsu QC tile selection
 python benchmarks/tiling/calibrate.py --slides /data/svs --out /data/calibration --resolution High --resolution Low
+
+# 4. Figures: tile selection maps and matched tile pairs from two runs kept with --keep-tfrecords
+python benchmarks/tiling/figures.py <slideflow_tfrecords_dir> <slideforge_tfrecords_dir> --slides /data/svs \
+    --tile-um 149 --mpp 0.499 --out benchmarks/tiling/figures --prefix high
 ```
 
 Each run happens in a fresh subprocess with its own slideflow project. Extracted tfrecords are deleted after each run
