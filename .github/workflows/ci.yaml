@@ -61,9 +61,11 @@ jobs:
 
       # pyrfr (slideflow -> smac -> pyrfr) only ships an sdist, and its bundled rapidjson fails to compile with the
       # GCC on ubuntu-latest (26.04) because of the -Wtemplate-body permerror. -fpermissive turns it back into a warning.
+      # setuptools compiles C++ with CXXFLAGS (which would replace Python's default flags), while CPPFLAGS is appended
+      # to both the C and C++ flags.
       - name: Install package with test dependencies
         env:
-          CFLAGS: "-fpermissive"
+          CPPFLAGS: "-fpermissive"
         run: |
           python -m pip install --upgrade pip
           pip install -e .[test]
