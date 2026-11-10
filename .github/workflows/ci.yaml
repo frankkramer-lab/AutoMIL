@@ -59,7 +59,11 @@ jobs:
           sudo rm -rf /usr/local/share/boost
           sudo rm -rf /usr/lib/jvm
 
+      # pyrfr (slideflow -> smac -> pyrfr) only ships an sdist, and its bundled rapidjson fails to compile with the
+      # GCC on ubuntu-latest (26.04) because of the -Wtemplate-body permerror. -fpermissive turns it back into a warning.
       - name: Install package with test dependencies
+        env:
+          CFLAGS: "-fpermissive"
         run: |
           python -m pip install --upgrade pip
           pip install -e .[test]
