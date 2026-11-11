@@ -59,7 +59,7 @@ vips = [
 
 # Experimental tile extraction backend, built from source (requires a Rust toolchain)
 slideforge = [
-  "slideforge @ git+https://github.com/WaibelJonas/slideforge@37773ea#subdirectory=python",
+  "slideforge @ git+https://github.com/WaibelJonas/slideforge@v0.4.0#subdirectory=python",
 ]
 
 test = [

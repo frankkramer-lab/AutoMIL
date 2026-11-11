@@ -59,7 +59,7 @@ never select exactly the same tiles, because they threshold different signals.
 | Settings | 2 backends × 2 resolutions × tissue detection on/off × 1, 4, 16 threads, 3 repeats each (72 runs) |
 | Stain normalization | Off |
 | Machine | AMD Ryzen 7 5800X (8 cores / 16 threads), WSL2 with 8 GB RAM, slides on the WSL disk |
-| Software | Python 3.12.3, slideflow 3.0.2 (cucim 26.10), slideforge 37773ea, AutoMIL f3edb49 + this branch |
+| Software | Python 3.12.3, slideflow 3.0.2 (cucim 26.10), slideforge 37773ea (same code as v0.4.0), AutoMIL f3edb49 + this branch |
 
 Each run uses a fresh subprocess and slideflow project. Pending disk writes are flushed before each run. The page cache
 is not dropped, so slides are read from a warm cache. Times are wall-clock time of the extraction call (including index
